@@ -5,6 +5,17 @@ from src.pipeline.config import RestaurantConfig
 
 DRIVE_SCOPES = ["https://www.googleapis.com/auth/drive.readonly"]
 
+# I file "nativi" di Google Workspace (es. Google Sheets) non hanno un'estensione
+# nel nome e non si possono scaricare come binario grezzo -- vanno esportati in un
+# formato equivalente (qui: xlsx). File caricati come veri .xlsx/.csv hanno un
+# mimeType diverso e si scaricano direttamente con get_media().
+GOOGLE_NATIVE_EXPORT_MIME = {
+    "application/vnd.google-apps.spreadsheet": (
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        ".xlsx",
+    ),
+}
+
 
 def _build_drive_service():
     from google.oauth2 import service_account
@@ -21,6 +32,17 @@ def _build_drive_service():
     return build("drive", "v3", credentials=credentials)
 
 
+def _effective_filename(file: dict) -> str:
+    """Nome del file una volta scaricato: per i file nativi Google Workspace
+    aggiunge l'estensione del formato di esportazione (assente nel nome originale)."""
+    export = GOOGLE_NATIVE_EXPORT_MIME.get(file["mimeType"])
+    if export is None:
+        return file["name"]
+
+    _, ext = export
+    return file["name"] if file["name"].lower().endswith(ext) else file["name"] + ext
+
+
 def _list_files_in_folder(service, folder_id: str, file_pattern: str) -> list[dict]:
     query = f"'{folder_id}' in parents and trashed = false"
     files = []
@@ -29,7 +51,7 @@ def _list_files_in_folder(service, folder_id: str, file_pattern: str) -> list[di
     while True:
         response = service.files().list(
             q=query,
-            fields="nextPageToken, files(id, name, modifiedTime)",
+            fields="nextPageToken, files(id, name, mimeType, modifiedTime)",
             pageToken=page_token,
         ).execute()
 
@@ -38,13 +60,19 @@ def _list_files_in_folder(service, folder_id: str, file_pattern: str) -> list[di
         if not page_token:
             break
 
-    return [f for f in files if fnmatch.fnmatch(f["name"], file_pattern)]
+    return [f for f in files if fnmatch.fnmatch(_effective_filename(f), file_pattern)]
 
 
-def _download_file(service, file_id: str, destination) -> None:
+def _download_file(service, file: dict, destination) -> None:
     from googleapiclient.http import MediaIoBaseDownload
 
-    request = service.files().get_media(fileId=file_id)
+    export = GOOGLE_NATIVE_EXPORT_MIME.get(file["mimeType"])
+    if export is not None:
+        export_mime, _ = export
+        request = service.files().export_media(fileId=file["id"], mimeType=export_mime)
+    else:
+        request = service.files().get_media(fileId=file["id"])
+
     with open(destination, "wb") as f:
         downloader = MediaIoBaseDownload(f, request)
         done = False
@@ -54,7 +82,8 @@ def _download_file(service, file_id: str, destination) -> None:
 
 def sync_from_drive(config: RestaurantConfig) -> int:
     """Scarica in config.raw_dir i file della cartella Google Drive
-    config.data_source.remote_folder_id che matchano file_pattern.
+    config.data_source.remote_folder_id che matchano file_pattern (una volta
+    applicata l'estensione effettiva, per i file nativi Google Workspace).
     Se remote_folder_id non e' configurato, non fa nulla (skip silenzioso --
     permette di lavorare/testare in locale senza accesso a Google Drive)."""
     folder_id = config.data_source.remote_folder_id
@@ -67,8 +96,8 @@ def sync_from_drive(config: RestaurantConfig) -> int:
     config.raw_dir.mkdir(parents=True, exist_ok=True)
 
     for file in files:
-        destination = config.raw_dir / file["name"]
-        _download_file(service, file["id"], destination)
+        destination = config.raw_dir / _effective_filename(file)
+        _download_file(service, file, destination)
 
     return len(files)
 

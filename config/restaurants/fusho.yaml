@@ -16,6 +16,7 @@ data_source:
   raw_path: "data/fusho/raw"
   file_pattern: "*.xlsx"
   year_regex: "20\\d{2}"
+  remote_folder_id: "1JEAC_8nZ_bCrfFGEYFlyo1UP0qvMCcuO"
 
 channel_map:
   POS: digital
