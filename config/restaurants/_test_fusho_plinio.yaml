@@ -35,11 +35,12 @@ duplicate_row_groups:
 
 audit:
   total_row_label: "Totale incasso"
-  # 100 (non 1.0 come per il file FUSHO gia' pulito): "Totale incasso" qui non
-  # include il contante consegnato ai rider delivery (GLOVO/DELIVEROO cash),
-  # quindi c'e' uno scarto sistematico fino a ~80 nei giorni con quel tipo di
-  # pagamento -- non un errore di dati, solo una definizione diversa di totale.
-  tolerance: 100.0
+  # 350 (non 1.0 come per il file FUSHO gia' pulito): "Totale incasso" qui non
+  # include il contante consegnato ai rider delivery (GLOVO/DELIVEROO cash) --
+  # confermato su 896 giorni (2024-2026): lo scarto scala con quanto cash
+  # delivery c'e' quel giorno (max osservato ~311 nei giorni di picco), non e'
+  # rumore casuale. Non un errore di dati, solo una definizione diversa di totale.
+  tolerance: 350.0
 
 events:
   manual_events_path: null

@@ -25,12 +25,27 @@ jobs:
       - name: Scrivi credenziali Google service account
         run: echo '${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}' > /tmp/gcp-key.json
 
+      - name: Ripristina stato sincronizzazione (rileva se i dati sono cambiati)
+        uses: actions/cache/restore@v4
+        with:
+          path: state/
+          key: sync-state-${{ github.run_id }}
+          restore-keys: |
+            sync-state-
+
       - name: Esegui pipeline per tutti i ristoranti
         env:
           GOOGLE_APPLICATION_CREDENTIALS: /tmp/gcp-key.json
           GMAIL_ADDRESS: ${{ secrets.GMAIL_ADDRESS }}
           GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
         run: python -m src.pipeline.run_all
+
+      - name: Salva stato sincronizzazione aggiornato
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: state/
+          key: sync-state-${{ github.run_id }}
 
       - name: Carica log e report come artifact
         if: always()

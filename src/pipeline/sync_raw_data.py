@@ -80,6 +80,22 @@ def _download_file(service, file: dict, destination) -> None:
             _, done = downloader.next_chunk()
 
 
+def get_remote_signature(config: RestaurantConfig) -> dict[str, str] | None:
+    """Elenca i file della cartella Drive (senza scaricarli) e ritorna una
+    mappa {nome_file: modifiedTime} -- una 'firma' leggera per capire se
+    qualcosa e' cambiato dall'ultima sincronizzazione, senza dover riscaricare
+    e riprocessare tutto ogni volta. None se remote_folder_id non e'
+    configurato (stesso comportamento di skip di sync_from_drive)."""
+    folder_id = config.data_source.remote_folder_id
+    if not folder_id:
+        return None
+
+    service = _build_drive_service()
+    files = _list_files_in_folder(service, folder_id, config.data_source.file_pattern)
+
+    return {file["name"]: file["modifiedTime"] for file in files}
+
+
 def sync_from_drive(config: RestaurantConfig) -> int:
     """Scarica in config.raw_dir i file della cartella Google Drive
     config.data_source.remote_folder_id che matchano file_pattern (una volta

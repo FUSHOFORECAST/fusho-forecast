@@ -13,6 +13,7 @@ __pycache__/
 /logs/
 /catboost_info/
 /knowledge_base/
+/state/
 
 # Segreti / credenziali locali
 *.env
