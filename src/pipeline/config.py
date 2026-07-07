@@ -36,6 +36,11 @@ class EventsConfig:
 
 
 @dataclasses.dataclass(frozen=True)
+class NotifyConfig:
+    recipient_email: str | None = None
+
+
+@dataclasses.dataclass(frozen=True)
 class FeaturesConfig:
     lags: list[int] = dataclasses.field(default_factory=lambda: [1, 7, 14, 21, 28, 30])
     rolling_windows: list[int] = dataclasses.field(default_factory=lambda: [7, 14, 30])
@@ -64,6 +69,7 @@ class RestaurantConfig:
     channel_map: dict[str, str]
     audit: AuditConfig
     events: EventsConfig
+    notify: NotifyConfig
     features: FeaturesConfig
     forecast: ForecastConfig
     model: ModelConfig
@@ -107,6 +113,7 @@ def load_restaurant_config(path: str | Path) -> RestaurantConfig:
     data_source = DataSourceConfig(**raw.get("data_source", {}))
     audit = AuditConfig(**raw.get("audit", {}))
     events = EventsConfig(**raw.get("events", {}))
+    notify = NotifyConfig(**raw.get("notify", {}))
     features = FeaturesConfig(**raw.get("features", {}))
     forecast = ForecastConfig(**raw.get("forecast", {}))
     model = ModelConfig(**raw.get("model", {}))
@@ -133,6 +140,7 @@ def load_restaurant_config(path: str | Path) -> RestaurantConfig:
         channel_map=raw["channel_map"],
         audit=audit,
         events=events,
+        notify=notify,
         features=features,
         forecast=forecast,
         model=model,

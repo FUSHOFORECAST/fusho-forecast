@@ -7,6 +7,8 @@ from datetime import datetime
 from pathlib import Path
 
 from src.pipeline.config import list_restaurant_configs, load_restaurant_config
+from src.pipeline.notify import send_email
+from src.pipeline.report import build_html_report
 from src.pipeline.run import run_pipeline
 from src.pipeline.sync_raw_data import sync_from_drive
 
@@ -38,6 +40,16 @@ def run_one(config_path: Path):
         success = False
         error_message = traceback.format_exc()
         buffer.write("\n" + error_message)
+
+    if success and config.notify.recipient_email:
+        try:
+            with redirect_stdout(buffer):
+                subject, html = build_html_report(config)
+                send_email(config.notify.recipient_email, subject, html)
+                print(f"Report inviato a {config.notify.recipient_email}")
+        except Exception:
+            buffer.write("\nAVVISO: invio email report fallito (run comunque valido):\n")
+            buffer.write(traceback.format_exc())
 
     duration = time.time() - start
     log_path.write_text(buffer.getvalue())

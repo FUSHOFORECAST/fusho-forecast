@@ -28,6 +28,8 @@ jobs:
       - name: Esegui pipeline per tutti i ristoranti
         env:
           GOOGLE_APPLICATION_CREDENTIALS: /tmp/gcp-key.json
+          GMAIL_ADDRESS: ${{ secrets.GMAIL_ADDRESS }}
+          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
         run: python -m src.pipeline.run_all
 
       - name: Carica log e report come artifact
