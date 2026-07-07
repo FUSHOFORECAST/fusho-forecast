@@ -5,12 +5,14 @@ __pycache__/
 .DS_Store
 
 # Dati e artefatti generati -- mai committare dati finanziari o output di run
-data/
-models/
-reports/
-logs/
-catboost_info/
-knowledge_base/
+# (con lo slash iniziale: solo alla radice del repo, per non nascondere
+# per errore pacchetti Python con lo stesso nome, es. src/models/)
+/data/
+/models/
+/reports/
+/logs/
+/catboost_info/
+/knowledge_base/
 
 # Segreti / credenziali locali
 *.env
