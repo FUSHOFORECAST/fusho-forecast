@@ -1,0 +1,48 @@
+restaurant_id: "fusho"
+display_name: "FUSHO"
+
+location:
+  city: "Milano"
+  country_code: "IT"
+  latitude: 45.4642
+  longitude: 9.1900
+  timezone: "Europe/Rome"
+
+locale:
+  language: "it"
+
+data_source:
+  format: "excel_monthly_it"
+  raw_path: "data/fusho/raw"
+  file_pattern: "*.xlsx"
+  year_regex: "20\\d{2}"
+
+channel_map:
+  POS: digital
+  TICKET: digital
+  SATISPAY: digital
+  CONTANTI: cash
+  UBER: delivery
+  "JUST EAT": delivery
+  GLOVO: delivery
+  DELIVEROO: delivery
+
+audit:
+  total_row_label: "TOTALE INCASSO"
+  tolerance: 1.0
+
+events:
+  manual_events_path: "data/processed/events_manual.csv"
+
+features:
+  lags: [1, 7, 14, 21, 28, 30]
+  rolling_windows: [7, 14, 30]
+  trend_windows: [7, 30]
+
+forecast:
+  horizon_days: 7
+  backtest_days: 60
+
+model:
+  candidates: ["random_forest", "catboost", "seasonal_naive"]
+  random_state: 42

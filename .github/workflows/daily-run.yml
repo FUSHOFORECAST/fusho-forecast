@@ -1,0 +1,41 @@
+name: Daily forecast run
+
+on:
+  schedule:
+    # 05:00 UTC ~= 06:00-07:00 ora italiana (l'offset cambia con l'ora legale/solare)
+    - cron: "0 5 * * *"
+  workflow_dispatch: {}
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          # NOTA: lo sviluppo locale usa Python 3.14 (molto recente). Se catboost/lightgbm
+          # non hanno ancora wheel precompilate per 3.14 su Linux, l'install fallira':
+          # in quel caso abbassare a "3.12" (versione stabile e ben supportata).
+          python-version: "3.13"
+
+      - name: Installa dipendenze
+        run: pip install -r requirements.txt
+
+      - name: Scrivi credenziali Google service account
+        run: echo '${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}' > /tmp/gcp-key.json
+
+      - name: Esegui pipeline per tutti i ristoranti
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: /tmp/gcp-key.json
+        run: python -m src.pipeline.run_all
+
+      - name: Carica log e report come artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: run-results-${{ github.run_id }}
+          path: |
+            logs/
+            reports/
+          retention-days: 30

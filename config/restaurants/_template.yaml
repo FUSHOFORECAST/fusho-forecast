@@ -1,0 +1,62 @@
+# Template per onboardare un nuovo ristorante nella pipeline di forecast.
+# Copia questo file in config/restaurants/<restaurant_id>.yaml e compila i valori.
+
+restaurant_id: "example_id"        # minuscolo, safe da filesystem: usato in data/{id}, reports/{id}, models/{id}
+display_name: "Example Restaurant"
+
+location:
+  city: "City Name"
+  country_code: "IT"               # ISO 3166-1 alpha-2, passato a holidays.country_holidays()
+  latitude: 45.4642
+  longitude: 9.1900
+  timezone: "Europe/Rome"          # nome timezone IANA, passato all'API meteo Open-Meteo
+
+locale:
+  language: "it"                   # controlla il dizionario mesi usato in ingest.py (it/en/...)
+
+data_source:
+  format: "excel_monthly_it"       # formato sorgente: quale adapter usare (src/pipeline/adapters/registry.py)
+                                    # "excel_monthly_it" = un file Excel per anno, un foglio per mese in italiano
+                                    #   (formato bookkeeping tipo FUSHO, richiede colonna "GIORNI" e riga totale)
+                                    # "wide_table" = CSV/Excel con colonna 'date' + una colonna per canale grezzo
+                                    #   (vedi config/restaurants/_example_wide_table.yaml)
+  raw_path: "data/example_id/raw"  # cartella con i file sorgente
+  file_pattern: "*.xlsx"           # pattern glob dei file sorgente dentro raw_path
+  year_regex: "20\\d{2}"           # regex per estrarre l'anno dal nome del file (solo excel_monthly_it)
+
+# Mappa: etichetta grezza (come appare nel file sorgente) -> nome canale.
+# Il set di canali della pipeline (per feature/modello/forecast) è derivato
+# automaticamente dai valori qui sotto (channels = valori unici di channel_map).
+channel_map:
+  POS: digital
+  TICKET: digital
+  SATISPAY: digital
+  CONTANTI: cash
+  UBER: delivery
+  "JUST EAT": delivery
+  GLOVO: delivery
+  DELIVEROO: delivery
+
+audit:
+  total_row_label: "TOTALE INCASSO"   # etichetta della riga con il totale dichiarato dalla fonte
+  tolerance: 1.0                       # |totale calcolato - totale dichiarato| oltre cui il giorno è escluso
+
+events:
+  manual_events_path: null          # percorso opzionale a un CSV eventi manuali; null per saltare
+  # Schema richiesto se presente: start_date,end_date,event_name,event_type,impact
+
+features:
+  lags: [1, 7, 14, 21, 28, 30]
+  rolling_windows: [7, 14, 30]
+  trend_windows: [7, 30]           # [finestra_corta, finestra_lunga] per {canale}_trend
+
+forecast:
+  horizon_days: 7                  # max 16 (limite endpoint forecast Open-Meteo)
+  backtest_days: 60
+
+model:
+  candidates: ["random_forest", "catboost", "seasonal_naive"]
+  random_state: 42
+  # varianti "_calibrated" disponibili (es. "catboost_calibrated") ma escluse di
+  # default: testate su FUSHO, non hanno migliorato l'accuratezza e triplicano
+  # il tempo di backtest. Aggiungile qui solo se validate utili per un ristorante.

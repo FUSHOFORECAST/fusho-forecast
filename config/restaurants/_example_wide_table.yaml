@@ -1,0 +1,62 @@
+# Esempio di config per l'adapter "wide_table" -- il formato di fallback generico
+# per quando un ristorante NON usa il formato Excel mensile di FUSHO.
+#
+# Formato sorgente atteso (CSV o Excel, uno o piu' file in data_source.raw_path):
+#   una riga per giorno, con:
+#     - una colonna 'date' (qualsiasi formato data leggibile da pandas)
+#     - una colonna per ogni etichetta grezza elencata in channel_map (sotto)
+#     - opzionale: una colonna con il totale dichiarato dalla fonte, il cui nome
+#       va indicato in audit.total_row_label -- se assente, il totale calcolato
+#       (somma dei canali) viene usato come riferimento e nessun giorno viene
+#       scartato dal controllo di audit.
+#
+# Esempio di riga: date,POS,TICKET,SATISPAY,CONTANTI,UBER,JUST EAT,GLOVO,DELIVEROO,total
+#                  2026-01-01,120.5,0,30,80,210,0,45,0,486
+
+restaurant_id: "example_wide_table"
+display_name: "Example Wide Table"
+
+location:
+  city: "City Name"
+  country_code: "IT"
+  latitude: 45.4642
+  longitude: 9.1900
+  timezone: "Europe/Rome"
+
+locale:
+  language: "it"
+
+data_source:
+  format: "wide_table"
+  raw_path: "data/example_wide_table/raw"
+  file_pattern: "*.csv"            # o "*.xlsx" se il ristorante fornisce un foglio Excel semplice
+
+channel_map:
+  POS: digital
+  TICKET: digital
+  SATISPAY: digital
+  CONTANTI: cash
+  UBER: delivery
+  "JUST EAT": delivery
+  GLOVO: delivery
+  DELIVEROO: delivery
+
+audit:
+  total_row_label: "total"         # nome della colonna con il totale dichiarato, se presente
+  tolerance: 1.0
+
+events:
+  manual_events_path: null
+
+features:
+  lags: [1, 7, 14, 21, 28, 30]
+  rolling_windows: [7, 14, 30]
+  trend_windows: [7, 30]
+
+forecast:
+  horizon_days: 7
+  backtest_days: 60
+
+model:
+  candidates: ["random_forest", "catboost", "seasonal_naive"]
+  random_state: 42

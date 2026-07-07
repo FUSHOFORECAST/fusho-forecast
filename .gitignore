@@ -1,0 +1,22 @@
+# Ambiente
+.venv/
+__pycache__/
+*.pyc
+.DS_Store
+
+# Dati e artefatti generati -- mai committare dati finanziari o output di run
+data/
+models/
+reports/
+logs/
+catboost_info/
+knowledge_base/
+
+# Segreti / credenziali locali
+*.env
+.env.*
+*-key.json
+*credentials*.json
+
+# Config/stato locale di Claude Code
+.claude/

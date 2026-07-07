@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>local.fushoforecast.dailyrun</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/Users/davidecroatto/FushoForecast/.venv/bin/python</string>
+        <string>-m</string>
+        <string>src.pipeline.run_all</string>
+    </array>
+
+    <key>WorkingDirectory</key>
+    <string>/Users/davidecroatto/FushoForecast</string>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PYTHONPATH</key>
+        <string>/Users/davidecroatto/FushoForecast</string>
+    </dict>
+
+    <!-- Esegue ogni giorno alle 06:00. Cambia Hour/Minute per un altro orario. -->
+    <key>StartCalendarInterval</key>
+    <dict>
+        <key>Hour</key>
+        <integer>6</integer>
+        <key>Minute</key>
+        <integer>0</integer>
+    </dict>
+
+    <key>RunAtLoad</key>
+    <false/>
+
+    <!-- Cattura output/errori non gestiti dal logging applicativo di run_all.py
+         (che scrive comunque in logs/{restaurant_id}/ e logs/run_all_summary.log). -->
+    <key>StandardOutPath</key>
+    <string>/Users/davidecroatto/FushoForecast/logs/launchd.out.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/davidecroatto/FushoForecast/logs/launchd.err.log</string>
+</dict>
+</plist>
