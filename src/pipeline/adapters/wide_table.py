@@ -3,7 +3,13 @@ import os
 
 import pandas as pd
 
-from src.pipeline.adapters.common import add_channel_shares, aggregate_channels, clean_money, slugify
+from src.pipeline.adapters.common import (
+    add_channel_shares,
+    aggregate_channels,
+    clean_money,
+    slugify,
+    trim_trailing_empty_days,
+)
 from src.pipeline.config import RestaurantConfig
 
 READERS = {
@@ -107,6 +113,8 @@ def extract(config: RestaurantConfig, persist: bool = True) -> tuple[pd.DataFram
 
     df = df.sort_values("date").reset_index(drop=True)
     audit_df = audit_df.sort_values("date").reset_index(drop=True)
+
+    df, audit_df = trim_trailing_empty_days(df, audit_df)
 
     df = add_channel_shares(df, config.channels)
 

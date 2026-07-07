@@ -55,7 +55,7 @@ class ForecastConfig:
 
 @dataclasses.dataclass(frozen=True)
 class ModelConfig:
-    candidates: list[str] = dataclasses.field(default_factory=lambda: ["random_forest", "catboost", "seasonal_naive"])
+    candidates: list[str] = dataclasses.field(default_factory=lambda: ["random_forest", "catboost", "seasonal_naive", "weekday_shrinkage"])
     random_state: int = 42
 
 
@@ -67,6 +67,7 @@ class RestaurantConfig:
     language: str
     data_source: DataSourceConfig
     channel_map: dict[str, str]
+    duplicate_row_groups: list[list[str]]
     audit: AuditConfig
     events: EventsConfig
     notify: NotifyConfig
@@ -125,10 +126,13 @@ def load_restaurant_config(path: str | Path) -> RestaurantConfig:
             f"in ordine crescente, ricevuto: {trend_windows}"
         )
 
-    if forecast.horizon_days > 16:
+    # Oltre 16 giorni non c'e' piu' un vero meteo previsto (nessun fornitore lo
+    # da'): forecast.py usa la climatologia stagionale per quei giorni, quindi
+    # qui il limite serve solo da guardia di sanita' su un orizzonte assurdo,
+    # non e' piu' legato al limite tecnico dell'API.
+    if forecast.horizon_days > 35:
         raise ValueError(
-            f"forecast.horizon_days={forecast.horizon_days} supera il limite di 16 giorni "
-            f"dell'endpoint forecast di Open-Meteo."
+            f"forecast.horizon_days={forecast.horizon_days} supera il limite di 35 giorni."
         )
 
     return RestaurantConfig(
@@ -138,6 +142,7 @@ def load_restaurant_config(path: str | Path) -> RestaurantConfig:
         language=raw["locale"]["language"],
         data_source=data_source,
         channel_map=raw["channel_map"],
+        duplicate_row_groups=raw.get("duplicate_row_groups", []),
         audit=audit,
         events=events,
         notify=notify,

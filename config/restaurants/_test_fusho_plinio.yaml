@@ -1,0 +1,58 @@
+restaurant_id: "fusho_plinio_test"
+display_name: "FUSHO PLINIO (test)"
+
+location:
+  city: "Milano"
+  country_code: "IT"
+  latitude: 45.4642
+  longitude: 9.1900
+  timezone: "Europe/Rome"
+
+locale:
+  language: "it"
+
+data_source:
+  format: "excel_monthly_it"
+  raw_path: "data/fusho_plinio_test/raw"
+  file_pattern: "*.xlsx"
+  year_regex: "20\\d{2}"
+
+channel_map:
+  POS: digital
+  TICKET: digital
+  SATISPAY: digital
+  SUMUP: digital
+  "JUST EAT": delivery
+  "GLOVO senza cash": delivery
+  "GLOVO cash": cash
+  "DELIVEROO senza cash": delivery
+  "DELIVEROO cash": cash
+  "Incasso cont. negozio": cash
+  "cont. tot giorno": cash
+
+duplicate_row_groups:
+  - ["Incasso cont. negozio", "cont. tot giorno"]
+
+audit:
+  total_row_label: "Totale incasso"
+  # 100 (non 1.0 come per il file FUSHO gia' pulito): "Totale incasso" qui non
+  # include il contante consegnato ai rider delivery (GLOVO/DELIVEROO cash),
+  # quindi c'e' uno scarto sistematico fino a ~80 nei giorni con quel tipo di
+  # pagamento -- non un errore di dati, solo una definizione diversa di totale.
+  tolerance: 100.0
+
+events:
+  manual_events_path: null
+
+features:
+  lags: [1, 7, 14, 21, 28, 30]
+  rolling_windows: [7, 14, 30]
+  trend_windows: [7, 30]
+
+forecast:
+  horizon_days: 30
+  backtest_days: 60
+
+model:
+  candidates: ["random_forest", "catboost", "seasonal_naive", "weekday_shrinkage"]
+  random_state: 42

@@ -6,7 +6,15 @@ import re
 import pandas as pd
 from openpyxl import load_workbook
 
-from src.pipeline.adapters.common import add_channel_shares, clean_money, normalize_text, slugify
+from src.pipeline.adapters.common import (
+    add_channel_shares,
+    aggregate_channels,
+    clean_money,
+    normalize_text,
+    resolve_duplicate_rows,
+    slugify,
+    trim_trailing_empty_days,
+)
 from src.pipeline.config import RestaurantConfig
 
 MONTHS_BY_LANGUAGE = {
@@ -27,10 +35,37 @@ def extract_year(filename: str, year_regex: str) -> int:
 
 def detect_month(sheet_name: str, months: dict[str, int]) -> int | None:
     s = sheet_name.lower().strip()
+
     for name, num in months.items():
         if name in s:
             return num
-    return None
+
+    # Fallback: foglio nominato direttamente col numero del mese (es. "06").
+    try:
+        numeric = int(s)
+    except ValueError:
+        return None
+
+    return numeric if 1 <= numeric <= 12 else None
+
+
+MIN_DAY_LIKE_CELLS = 15
+
+
+def _count_day_like_cells(ws, row: int, max_scan_cols: int) -> int:
+    count = 0
+    for col in range(1, min(ws.max_column, max_scan_cols) + 1):
+        value = ws.cell(row=row, column=col).value
+        if value is None:
+            continue
+        text_value = str(value).strip()
+        try:
+            day = int(float(text_value))
+        except ValueError:
+            continue
+        if 1 <= day <= 31:
+            count += 1
+    return count
 
 
 def find_days_row(ws, max_scan_rows: int = 30, max_scan_cols: int = 40) -> int | None:
@@ -41,7 +76,17 @@ def find_days_row(ws, max_scan_rows: int = 30, max_scan_cols: int = 40) -> int |
         ]
         if any(v == "GIORNI" for v in values):
             return row
-    return None
+
+    # Fallback: nessuna etichetta "GIORNI" trovata -- cerca la riga con piu'
+    # celle che sembrano numeri di giorno (1-31). Richiede una soglia minima
+    # per evitare falsi positivi su righe di importi.
+    best_row, best_count = None, 0
+    for row in range(1, min(ws.max_row, max_scan_rows) + 1):
+        count = _count_day_like_cells(ws, row, max_scan_cols)
+        if count > best_count:
+            best_row, best_count = row, count
+
+    return best_row if best_count >= MIN_DAY_LIKE_CELLS else None
 
 
 def get_day_columns(ws, days_row: int, year: int, month: int) -> list[tuple[int, int]]:
@@ -113,10 +158,8 @@ def parse_sheet(ws, year: int, month: int, source_file: str, sheet_name: str, co
                 value = clean_money(ws.cell(row=row, column=col).value)
             raw_values[raw_channel] = value
 
-        channel_totals = {channel: 0.0 for channel in config.channels}
-        for raw_channel, value in raw_values.items():
-            channel = config.channel_map[raw_channel]
-            channel_totals[channel] += value
+        raw_values = resolve_duplicate_rows(raw_values, config.duplicate_row_groups)
+        channel_totals = aggregate_channels(raw_values, config.channel_map, config.channels)
 
         computed_total = sum(channel_totals.values())
 
@@ -197,6 +240,8 @@ def extract(config: RestaurantConfig, persist: bool = True) -> tuple[pd.DataFram
 
     df = df.sort_values("date").reset_index(drop=True)
     audit_df = audit_df.sort_values("date").reset_index(drop=True)
+
+    df, audit_df = trim_trailing_empty_days(df, audit_df)
 
     df = add_channel_shares(df, config.channels)
 

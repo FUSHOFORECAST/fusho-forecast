@@ -7,6 +7,7 @@ from src.models.calibrated_model import create_calibrated_model
 from src.models.catboost_model import create_model as create_catboost_model
 from src.models.random_forest_model import create_model as create_random_forest_model
 from src.models.seasonal_naive_model import create_model as create_seasonal_naive_model
+from src.models.weekday_shrinkage_model import create_model as create_weekday_shrinkage_model
 from src.pipeline.config import RestaurantConfig
 from src.pipeline.ingest import slugify
 
@@ -14,6 +15,7 @@ BASE_MODEL_FACTORIES = {
     "random_forest": create_random_forest_model,
     "catboost": create_catboost_model,
     "seasonal_naive": create_seasonal_naive_model,
+    "weekday_shrinkage": create_weekday_shrinkage_model,
 }
 
 # Ogni modello base ottiene automaticamente una variante "_calibrated": stesso

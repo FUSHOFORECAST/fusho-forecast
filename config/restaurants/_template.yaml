@@ -55,7 +55,7 @@ forecast:
   backtest_days: 60
 
 model:
-  candidates: ["random_forest", "catboost", "seasonal_naive"]
+  candidates: ["random_forest", "catboost", "seasonal_naive", "weekday_shrinkage"]
   random_state: 42
   # varianti "_calibrated" disponibili (es. "catboost_calibrated") ma escluse di
   # default: testate su FUSHO, non hanno migliorato l'accuratezza e triplicano

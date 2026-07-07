@@ -7,17 +7,64 @@ from src.pipeline.config import RestaurantConfig
 from src.pipeline.events import merge_events
 from src.pipeline.features import add_calendar_derived_fields
 from src.pipeline.profile import profile_features
-from src.pipeline.weather import fetch_forecast_weather, fetch_historical_weather, merge_weather
+from src.pipeline.weather import (
+    MAX_FORECAST_DAYS,
+    estimate_seasonal_weather,
+    fetch_forecast_weather,
+    fetch_historical_weather,
+    merge_weather,
+)
 
 
-def build_future_calendar_weather_events(config: RestaurantConfig, last_date: pd.Timestamp, horizon_days: int) -> pd.DataFrame:
+def build_future_calendar_weather_events(
+    config: RestaurantConfig,
+    last_date: pd.Timestamp,
+    horizon_days: int,
+    historical_weather_df: pd.DataFrame | None = None,
+) -> pd.DataFrame:
+    """Costruisce calendario/meteo/eventi per i prossimi horizon_days giorni
+    dopo last_date. last_date puo' essere molto indietro rispetto ad oggi
+    (es. dati compilati una volta al mese): il meteo va quindi sorgente in
+    modo diverso a seconda di quanto ogni data e' lontana da oggi --
+    l'endpoint forecast di Open-Meteo restituisce sempre il meteo a partire
+    da oggi reale, non da last_date, quindi non si puo' assumere che le
+    prime horizon_days coincidano con l'oggi dell'API.
+      - date gia' passate (rispetto ad oggi reale): meteo storico vero (archive)
+      - da oggi ai prossimi MAX_FORECAST_DAYS giorni: meteo previsto vero (forecast)
+      - oltre: climatologia stagionale (nessun fornitore da' previsioni reali li')
+    """
     future_dates = [last_date + timedelta(days=i) for i in range(1, horizon_days + 1)]
     future_df = pd.DataFrame({"date": future_dates})
 
     future_df = add_calendar_features(future_df, config)
 
-    weather_fc = fetch_forecast_weather(config, horizon_days)
-    future_df = merge_weather(future_df, weather_fc)
+    today = pd.Timestamp.now().normalize()
+
+    past_dates = [d for d in future_dates if d < today]
+    forecast_dates = [d for d in future_dates if today <= d < today + timedelta(days=MAX_FORECAST_DAYS)]
+    far_dates = [d for d in future_dates if d >= today + timedelta(days=MAX_FORECAST_DAYS)]
+
+    weather_parts = []
+
+    if past_dates:
+        weather_parts.append(
+            fetch_historical_weather(config, past_dates[0].strftime("%Y-%m-%d"), past_dates[-1].strftime("%Y-%m-%d"))
+        )
+
+    if forecast_dates:
+        weather_fc = fetch_forecast_weather(config, len(forecast_dates))
+        weather_parts.append(weather_fc[weather_fc["date"].isin(forecast_dates)])
+
+    if far_dates:
+        if historical_weather_df is None:
+            raise ValueError(
+                f"{len(far_dates)} giorni dell'orizzonte sono oltre i {MAX_FORECAST_DAYS} giorni di previsione "
+                f"meteo reale: serve historical_weather_df per stimarli via climatologia stagionale."
+            )
+        weather_parts.append(estimate_seasonal_weather(historical_weather_df, far_dates))
+
+    weather_combined = pd.concat(weather_parts, ignore_index=True)
+    future_df = merge_weather(future_df, weather_combined)
 
     future_df = merge_events(future_df, config)
 
@@ -60,7 +107,9 @@ def recursive_forecast(
     short_window, long_window = config.features.trend_windows
 
     if future_meta is None:
-        future_meta = build_future_calendar_weather_events(config, last_date, config.forecast.horizon_days)
+        future_meta = build_future_calendar_weather_events(
+            config, last_date, config.forecast.horizon_days, historical_weather_df=history_df
+        )
 
     horizon_days = len(future_meta)
 

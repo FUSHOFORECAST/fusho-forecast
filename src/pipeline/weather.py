@@ -77,6 +77,47 @@ def fetch_forecast_weather(config: RestaurantConfig, horizon_days: int) -> pd.Da
     return _parse_daily_response(response.json())
 
 
+SEASONAL_WINDOW_DAYS = 5
+SEASONAL_WEATHER_COLUMNS = ["temp_max", "temp_min", "precipitation", "rain", "snowfall", "wind_max"]
+
+
+def estimate_seasonal_weather(historical_df: pd.DataFrame, dates: list) -> pd.DataFrame:
+    """Stima il meteo per date lontane nel futuro (oltre il limite di 16 giorni
+    dell'endpoint forecast, dove nessuna previsione reale e' disponibile da
+    nessun fornitore) come media storica (climatologia) delle date con lo
+    stesso giorno dell'anno, +/- qualche giorno, negli anni passati presenti
+    in historical_df."""
+    hist = historical_df.copy()
+    hist["date"] = pd.to_datetime(hist["date"])
+    hist["doy"] = hist["date"].dt.dayofyear
+
+    rows = []
+    for date in dates:
+        date = pd.Timestamp(date)
+        doy = date.dayofyear
+        doy_window = {((doy + offset - 1) % 366) + 1 for offset in range(-SEASONAL_WINDOW_DAYS, SEASONAL_WINDOW_DAYS + 1)}
+        matching = hist[hist["doy"].isin(doy_window)]
+
+        # Con meno di un anno di storico potrebbe non esserci ancora nessun
+        # giorno registrato in questo periodo dell'anno (es. un ristorante
+        # nuovo che non ha ancora visto una prima estate/inverno): in quel
+        # caso si usa la media generale dello storico disponibile invece di
+        # lasciare valori vuoti.
+        source = matching if len(matching) > 0 else hist
+
+        row = {"date": date}
+        for col in SEASONAL_WEATHER_COLUMNS:
+            row[col] = source[col].mean() if col in source.columns else None
+        rows.append(row)
+
+    weather = pd.DataFrame(rows)
+    weather["is_rainy"] = (weather["rain"] > 0).astype(int)
+    weather["is_heavy_rain"] = (weather["rain"] >= 10).astype(int)
+    weather["avg_temp"] = (weather["temp_max"] + weather["temp_min"]) / 2
+
+    return weather
+
+
 def merge_weather(df: pd.DataFrame, weather_df: pd.DataFrame) -> pd.DataFrame:
     out = df.copy()
     out["date"] = pd.to_datetime(out["date"])
