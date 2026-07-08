@@ -3,6 +3,7 @@ display_name: "FUSHO"
 
 location:
   city: "Milano"
+  address: "Via Plinio, 5, 20129 Milano MI"
   country_code: "IT"
   latitude: 45.4642
   longitude: 9.1900
