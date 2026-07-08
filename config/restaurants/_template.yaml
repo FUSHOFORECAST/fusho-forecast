@@ -6,6 +6,8 @@ display_name: "Example Restaurant"
 
 location:
   city: "City Name"
+  address: null                    # opzionale, via e civico -- non usato dalla pipeline oggi,
+                                    # raccolto per future feature iper-locali (eventi di zona, ecc.)
   country_code: "IT"               # ISO 3166-1 alpha-2, passato a holidays.country_holidays()
   latitude: 45.4642
   longitude: 9.1900

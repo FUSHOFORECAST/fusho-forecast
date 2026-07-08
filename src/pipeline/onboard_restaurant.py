@@ -49,6 +49,7 @@ def build_config(
     latitude: float,
     longitude: float,
     timezone: str,
+    address: str,
     remote_folder_id: str,
     recipient_email: str,
 ) -> dict:
@@ -61,6 +62,7 @@ def build_config(
             "latitude": latitude,
             "longitude": longitude,
             "timezone": timezone,
+            "address": address or None,
         },
         "locale": {"language": "it"},
         "data_source": {
@@ -91,6 +93,7 @@ def main():
     restaurant_id = ask("ID interno (minuscolo, senza spazi, usato nei percorsi)", slugify_id(display_name))
 
     city = ask("Citta'", "Milano")
+    address = ask("Indirizzo completo (via e numero civico, opzionale)", "")
     country_code = ask("Codice paese (ISO, es. IT)", "IT")
     latitude = float(ask("Latitudine", "45.4642"))
     longitude = float(ask("Longitudine", "9.1900"))
@@ -106,7 +109,7 @@ def main():
 
     config = build_config(
         restaurant_id, display_name, city, country_code, latitude, longitude, timezone,
-        remote_folder_id, recipient_email,
+        address, remote_folder_id, recipient_email,
     )
 
     output_path = Path("config/restaurants") / f"{restaurant_id}.yaml"

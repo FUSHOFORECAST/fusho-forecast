@@ -13,6 +13,7 @@ class LocationConfig:
     latitude: float
     longitude: float
     timezone: str
+    address: str | None = None
 
 
 @dataclasses.dataclass(frozen=True)
