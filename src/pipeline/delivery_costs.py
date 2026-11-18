@@ -51,13 +51,17 @@ LABEL_KEY_MAP = {
     "importo del bonifico": "importo_bonifico",
 }
 
-# Le tre voci che l'utente vuole vedere, piu' "altro" per tutto cio' che non
+# I bucket che l'utente vuole vedere, piu' "altro" per tutto cio' che non
 # rientra chiaramente li' (incluse eventuali voci nuove non ancora mappate
-# sopra -- mai perse, finiscono qui). Le voci "meta" sono valori di
-# riepilogo/bonifico della fattura, non costi autonomi, e vanno escluse dalla
-# somma di "altro" per non contare due volte.
+# sopra -- mai perse, finiscono qui). "Sconti" (promozioni sul prezzo a
+# carico del ristorante) e' tenuto separato da "ads" (vera spesa di
+# marketing/visibilita'): sono entrambi "leve commerciali" ma di natura
+# diversa, e l'utente li vuole confrontare separatamente col fatturato netto.
+# Le voci "meta" sono valori di riepilogo/bonifico della fattura, non costi
+# autonomi, e vanno escluse dalla somma di "altro" per non contare due volte.
 COMMISSIONE_FIELDS = {"commissioni"}
-ADS_FIELDS = {"marketing_visibilita", "supplemento_prime", "promo_consegna", "promo_prodotti"}
+ADS_FIELDS = {"marketing_visibilita", "supplemento_prime"}
+SCONTI_FIELDS = {"promo_consegna", "promo_prodotti"}
 ERRORI_FIELDS = {"costo_incidenti_prodotti", "tariffa_attesa", "costo_annullamenti", "consegna_gratuita_incidente"}
 META_FIELDS = {
     "subtotale", "iva", "totale_fattura", "prodotti", "servizio_consegna",
@@ -108,8 +112,12 @@ def _it_number_to_float(value: str) -> float:
 
 def _delivery_costs_state_id(restaurant_id: str) -> str:
     """Identificativo di stato separato da sync_raw_data.py e food_cost.py --
-    evita di sovrascrivere lo stato di altri flussi dati."""
-    return f"{restaurant_id}_glovo"
+    evita di sovrascrivere lo stato di altri flussi dati. Il suffisso "_v2"
+    forza un riparsing completo di tutte le fatture quando cambia lo schema
+    dei campi salvati (qui: separazione sconti/ads + fatturato netto) --
+    altrimenti la cache di stato su GitHub Actions terrebbe per sempre i
+    record vecchi, dato che il riparsing scatta solo sui filename nuovi."""
+    return f"{restaurant_id}_glovo_v2"
 
 
 def _find_invoice_pdfs(service, folder_id: str) -> list[dict]:
@@ -195,14 +203,25 @@ def parse_invoice_pdf(path: Path) -> dict:
     def sum_fields(fields: set[str]) -> float:
         return round(sum(raw.get(f, 0.0) for f in fields), 2)
 
-    known_fields = COMMISSIONE_FIELDS | ADS_FIELDS | ERRORI_FIELDS | META_FIELDS
+    known_fields = COMMISSIONE_FIELDS | ADS_FIELDS | SCONTI_FIELDS | ERRORI_FIELDS | META_FIELDS
     altro = round(sum(v for k, v in raw.items() if k not in known_fields), 2)
+
+    prodotti = raw.get("prodotti", 0.0)
+    sconti = sum_fields(SCONTI_FIELDS)
+    # "Prodotti" e' il fatturato lordo dei prodotti venduti tramite Glovo
+    # (prima di IVA); il fatturato netto sottrae solo gli sconti/promozioni
+    # che il ristorante ha finanziato -- non commissioni/ads/errori, che sono
+    # costi sul fatturato netto, non riduzioni del fatturato stesso.
+    fatturato_netto = round(prodotti - sconti, 2)
 
     return {
         "filename": path.name,
         "invoice_number": invoice_match.group(1) if invoice_match else None,
         "period_start": period_match.group(1) if period_match else None,
         "period_end": period_match.group(2) if period_match else None,
+        "prodotti": prodotti,
+        "sconti": sconti,
+        "fatturato_netto": fatturato_netto,
         "commissione": sum_fields(COMMISSIONE_FIELDS),
         "ads": sum_fields(ADS_FIELDS),
         "errori": sum_fields(ERRORI_FIELDS),
@@ -226,6 +245,7 @@ def _save_glovo_record(restaurant_id: str, filename: str, record: dict) -> None:
 
 _INVOICE_FIELDS = [
     "filename", "invoice_number", "period_start", "period_end",
+    "prodotti", "sconti", "fatturato_netto",
     "commissione", "ads", "errori", "altro", "totale_fattura", "importo_bonifico",
 ]
 
@@ -246,7 +266,10 @@ def _append_invoices_csv(config: RestaurantConfig, records: dict[str, dict]) -> 
 
 def _aggregate_monthly(config: RestaurantConfig, records: dict[str, dict]) -> None:
     monthly: dict[str, dict] = {}
-    money_fields = ["commissione", "ads", "errori", "altro", "totale_fattura", "importo_bonifico"]
+    money_fields = [
+        "prodotti", "sconti", "fatturato_netto",
+        "commissione", "ads", "errori", "altro", "totale_fattura", "importo_bonifico",
+    ]
 
     for record in records.values():
         period_start = record.get("period_start")
