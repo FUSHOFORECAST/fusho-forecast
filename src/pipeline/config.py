@@ -17,28 +17,8 @@ class LocationConfig:
 
 
 @dataclasses.dataclass(frozen=True)
-class DataSourceConfig:
-    raw_path: str
-    format: str = "excel_monthly_it"
-    file_pattern: str = "*.xlsx"
-    year_regex: str = r"20\d{2}"
-    remote_folder_id: str | None = None
-
-
-@dataclasses.dataclass(frozen=True)
-class AuditConfig:
-    total_row_label: str = "TOTALE INCASSO"
-    tolerance: float = 1.0
-
-
-@dataclasses.dataclass(frozen=True)
-class EventsConfig:
-    manual_events_path: str | None = None
-
-
-@dataclasses.dataclass(frozen=True)
-class NotifyConfig:
-    recipient_email: str | None = None
+class FoodCostConfig:
+    ddt_folder_id: str | None = None
 
 
 @dataclasses.dataclass(frozen=True)
@@ -47,49 +27,16 @@ class DeliveryCostsConfig:
 
 
 @dataclasses.dataclass(frozen=True)
-class FeaturesConfig:
-    lags: list[int] = dataclasses.field(default_factory=lambda: [1, 7, 14, 21, 28, 30])
-    rolling_windows: list[int] = dataclasses.field(default_factory=lambda: [7, 14, 30])
-    trend_windows: list[int] = dataclasses.field(default_factory=lambda: [7, 30])
-
-
-@dataclasses.dataclass(frozen=True)
-class ForecastConfig:
-    horizon_days: int = 7
-    backtest_days: int = 60
-
-
-@dataclasses.dataclass(frozen=True)
-class ModelConfig:
-    candidates: list[str] = dataclasses.field(default_factory=lambda: ["random_forest", "catboost", "seasonal_naive", "weekday_shrinkage"])
-    random_state: int = 42
-
-
-@dataclasses.dataclass(frozen=True)
 class RestaurantConfig:
     restaurant_id: str
     display_name: str
     location: LocationConfig
-    language: str
-    data_source: DataSourceConfig
-    channel_map: dict[str, str]
-    duplicate_row_groups: list[list[str]]
-    audit: AuditConfig
-    events: EventsConfig
-    notify: NotifyConfig
+    food_cost: FoodCostConfig
     delivery_costs: DeliveryCostsConfig
-    features: FeaturesConfig
-    forecast: ForecastConfig
-    model: ModelConfig
 
     @property
-    def channels(self) -> list[str]:
-        """Nomi canale unici, derivati da channel_map -- generalizza a qualsiasi numero di canali."""
-        return sorted(set(self.channel_map.values()))
-
-    @property
-    def raw_dir(self) -> Path:
-        return Path(self.data_source.raw_path)
+    def raw_ddt_dir(self) -> Path:
+        return Path(f"data/{self.restaurant_id}/raw_ddt")
 
     @property
     def raw_glovo_dir(self) -> Path:
@@ -99,22 +46,8 @@ class RestaurantConfig:
     def processed_dir(self) -> Path:
         return Path(f"data/{self.restaurant_id}/processed")
 
-    @property
-    def reports_dir(self) -> Path:
-        return Path(f"reports/{self.restaurant_id}")
-
-    @property
-    def models_dir(self) -> Path:
-        return Path(f"models/{self.restaurant_id}")
-
     def processed_path(self, name: str) -> Path:
         return self.processed_dir / name
-
-    def reports_path(self, name: str) -> Path:
-        return self.reports_dir / name
-
-    def models_path(self, name: str) -> Path:
-        return self.models_dir / name
 
 
 def load_restaurant_config(path: str | Path) -> RestaurantConfig:
@@ -122,46 +55,15 @@ def load_restaurant_config(path: str | Path) -> RestaurantConfig:
         raw = yaml.safe_load(f)
 
     location = LocationConfig(**raw["location"])
-    data_source = DataSourceConfig(**raw.get("data_source", {}))
-    audit = AuditConfig(**raw.get("audit", {}))
-    events = EventsConfig(**raw.get("events", {}))
-    notify = NotifyConfig(**raw.get("notify", {}))
+    food_cost = FoodCostConfig(**raw.get("food_cost", {}))
     delivery_costs = DeliveryCostsConfig(**raw.get("delivery_costs", {}))
-    features = FeaturesConfig(**raw.get("features", {}))
-    forecast = ForecastConfig(**raw.get("forecast", {}))
-    model = ModelConfig(**raw.get("model", {}))
-
-    trend_windows = features.trend_windows
-    if len(trend_windows) != 2 or trend_windows[0] >= trend_windows[1]:
-        raise ValueError(
-            f"features.trend_windows deve avere esattamente [finestra_corta, finestra_lunga] "
-            f"in ordine crescente, ricevuto: {trend_windows}"
-        )
-
-    # Oltre 16 giorni non c'e' piu' un vero meteo previsto (nessun fornitore lo
-    # da'): forecast.py usa la climatologia stagionale per quei giorni, quindi
-    # qui il limite serve solo da guardia di sanita' su un orizzonte assurdo,
-    # non e' piu' legato al limite tecnico dell'API.
-    if forecast.horizon_days > 35:
-        raise ValueError(
-            f"forecast.horizon_days={forecast.horizon_days} supera il limite di 35 giorni."
-        )
 
     return RestaurantConfig(
         restaurant_id=raw["restaurant_id"],
         display_name=raw["display_name"],
         location=location,
-        language=raw["locale"]["language"],
-        data_source=data_source,
-        channel_map=raw["channel_map"],
-        duplicate_row_groups=raw.get("duplicate_row_groups", []),
-        audit=audit,
-        events=events,
-        notify=notify,
+        food_cost=food_cost,
         delivery_costs=delivery_costs,
-        features=features,
-        forecast=forecast,
-        model=model,
     )
 
 

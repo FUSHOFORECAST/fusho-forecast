@@ -1,8 +1,6 @@
 import fnmatch
 import os
 
-from src.pipeline.config import RestaurantConfig
-
 DRIVE_SCOPES = ["https://www.googleapis.com/auth/drive.readonly"]
 
 # I file "nativi" di Google Workspace (es. Google Sheets) non hanno un'estensione
@@ -80,61 +78,3 @@ def _download_file(service, file: dict, destination) -> None:
             _, done = downloader.next_chunk()
 
 
-def get_remote_signature(config: RestaurantConfig) -> dict[str, str] | None:
-    """Elenca i file della cartella Drive (senza scaricarli) e ritorna una
-    mappa {nome_file: modifiedTime} -- una 'firma' leggera per capire se
-    qualcosa e' cambiato dall'ultima sincronizzazione, senza dover riscaricare
-    e riprocessare tutto ogni volta. None se remote_folder_id non e'
-    configurato (stesso comportamento di skip di sync_from_drive)."""
-    folder_id = config.data_source.remote_folder_id
-    if not folder_id:
-        return None
-
-    service = _build_drive_service()
-    files = _list_files_in_folder(service, folder_id, config.data_source.file_pattern)
-
-    return {file["name"]: file["modifiedTime"] for file in files}
-
-
-def sync_from_drive(config: RestaurantConfig) -> int:
-    """Scarica in config.raw_dir i file della cartella Google Drive
-    config.data_source.remote_folder_id che matchano file_pattern (una volta
-    applicata l'estensione effettiva, per i file nativi Google Workspace).
-    Se remote_folder_id non e' configurato, non fa nulla (skip silenzioso --
-    permette di lavorare/testare in locale senza accesso a Google Drive)."""
-    folder_id = config.data_source.remote_folder_id
-    if not folder_id:
-        return 0
-
-    service = _build_drive_service()
-    files = _list_files_in_folder(service, folder_id, config.data_source.file_pattern)
-
-    config.raw_dir.mkdir(parents=True, exist_ok=True)
-
-    for file in files:
-        destination = config.raw_dir / _effective_filename(file)
-        _download_file(service, file, destination)
-
-    return len(files)
-
-
-def main():
-    import argparse
-
-    from src.pipeline.config import load_restaurant_config
-
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--config", required=True)
-    args = parser.parse_args()
-
-    config = load_restaurant_config(args.config)
-    count = sync_from_drive(config)
-
-    if not config.data_source.remote_folder_id:
-        print(f"{config.restaurant_id}: nessun remote_folder_id configurato, sync saltata.")
-    else:
-        print(f"{config.restaurant_id}: {count} file scaricati in {config.raw_dir}")
-
-
-if __name__ == "__main__":
-    main()

@@ -1,9 +1,11 @@
-name: Daily forecast run
+name: Weekly costs run
 
 on:
   schedule:
-    # 05:00 UTC ~= 06:00-07:00 ora italiana (l'offset cambia con l'ora legale/solare)
-    - cron: "0 5 * * *"
+    # Lunedi' 05:00 UTC ~= 06:00-07:00 ora italiana (l'offset cambia con l'ora legale/solare).
+    # Settimanale: restano solo food cost (DDT) e costi delivery (fatture Glovo,
+    # che arrivano ogni due settimane), non serve piu' girare ogni giorno.
+    - cron: "0 5 * * 1"
   workflow_dispatch: {}
 
 jobs:
@@ -14,9 +16,6 @@ jobs:
 
       - uses: actions/setup-python@v5
         with:
-          # NOTA: lo sviluppo locale usa Python 3.14 (molto recente). Se catboost/lightgbm
-          # non hanno ancora wheel precompilate per 3.14 su Linux, l'install fallira':
-          # in quel caso abbassare a "3.12" (versione stabile e ben supportata).
           python-version: "3.13"
 
       - name: Installa dipendenze
@@ -36,8 +35,7 @@ jobs:
       - name: Esegui pipeline per tutti i ristoranti
         env:
           GOOGLE_APPLICATION_CREDENTIALS: /tmp/gcp-key.json
-          GMAIL_ADDRESS: ${{ secrets.GMAIL_ADDRESS }}
-          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: python -m src.pipeline.run_all
 
       - name: Salva stato sincronizzazione aggiornato
@@ -54,6 +52,5 @@ jobs:
           name: run-results-${{ github.run_id }}
           path: |
             logs/
-            reports/
             data/*/processed/
           retention-days: 30

@@ -1,34 +1,12 @@
 """Wizard interattivo per registrare un nuovo ristorante nel sistema.
 
 Uso: PYTHONPATH=. .venv/bin/python -m src.pipeline.onboard_restaurant
-
-Presume lo stesso formato foglio/canali gia' validato su FUSHO PLINIO (tutti
-i ristoranti del prodotto usano lo stesso modello, per ora). Se un futuro
-ristorante avesse un formato diverso, il file generato va rifinito a mano
-(o richiede una nuova config/adapter dedicata).
 """
 
 import re
 from pathlib import Path
 
 import yaml
-
-DEFAULT_CHANNEL_MAP = {
-    "POS": "digital",
-    "TICKET": "digital",
-    "SATISPAY": "digital",
-    "SUMUP": "digital",
-    "JUST EAT": "delivery",
-    "GLOVO senza cash": "delivery",
-    "DELIVEROO senza cash": "delivery",
-    "GLOVO cash": "cash",
-    "DELIVEROO cash": "cash",
-    "Incasso cont. negozio": "cash",
-    "cont. tot giorno": "cash",
-}
-DEFAULT_DUPLICATE_ROW_GROUPS = [["Incasso cont. negozio", "cont. tot giorno"]]
-DEFAULT_TOTAL_ROW_LABEL = "Totale incasso"
-DEFAULT_AUDIT_TOLERANCE = 350.0
 
 
 def ask(prompt: str, default: str | None = None) -> str:
@@ -50,8 +28,8 @@ def build_config(
     longitude: float,
     timezone: str,
     address: str,
-    remote_folder_id: str,
-    recipient_email: str,
+    ddt_folder_id: str,
+    glovo_folder_id: str,
 ) -> dict:
     return {
         "restaurant_id": restaurant_id,
@@ -64,26 +42,8 @@ def build_config(
             "timezone": timezone,
             "address": address or None,
         },
-        "locale": {"language": "it"},
-        "data_source": {
-            "format": "excel_monthly_it",
-            "raw_path": f"data/{restaurant_id}/raw",
-            "file_pattern": "*.xlsx",
-            "year_regex": r"20\d{2}",
-            "remote_folder_id": remote_folder_id,
-        },
-        "channel_map": DEFAULT_CHANNEL_MAP,
-        "duplicate_row_groups": DEFAULT_DUPLICATE_ROW_GROUPS,
-        "audit": {"total_row_label": DEFAULT_TOTAL_ROW_LABEL, "tolerance": DEFAULT_AUDIT_TOLERANCE},
-        "events": {"manual_events_path": None},
-        "notify": {"recipient_email": recipient_email or None},
-        "delivery_costs": {"glovo_folder_id": None},
-        "features": {"lags": [1, 7, 14, 21, 28, 30], "rolling_windows": [7, 14, 30], "trend_windows": [7, 30]},
-        "forecast": {"horizon_days": 31, "backtest_days": 60},
-        "model": {
-            "candidates": ["random_forest", "catboost", "seasonal_naive", "weekday_shrinkage"],
-            "random_state": 42,
-        },
+        "food_cost": {"ddt_folder_id": ddt_folder_id or None},
+        "delivery_costs": {"glovo_folder_id": glovo_folder_id or None},
     }
 
 
@@ -101,16 +61,21 @@ def main():
     timezone = ask("Timezone", "Europe/Rome")
 
     print(
-        "\nID della cartella Google Drive del ristorante (deve essere gia' "
-        "condivisa con l'email del service account, permesso Visualizzatore)."
+        "\nID cartella Google Drive con le foto DDT (fornitori), vuoto per "
+        "disattivare il food cost. Deve essere condivisa (Visualizzatore) con "
+        "l'email del service account."
     )
-    remote_folder_id = ask("ID cartella Drive")
+    ddt_folder_id = ask("ID cartella DDT", "")
 
-    recipient_email = ask("Email per il report giornaliero (vuoto = nessun report)", "")
+    print(
+        "\nID cartella Google Drive con le fatture Glovo, vuoto per "
+        "disattivare i costi delivery. Stessa condivisione di sopra."
+    )
+    glovo_folder_id = ask("ID cartella Glovo", "")
 
     config = build_config(
         restaurant_id, display_name, city, country_code, latitude, longitude, timezone,
-        address, remote_folder_id, recipient_email,
+        address, ddt_folder_id, glovo_folder_id,
     )
 
     output_path = Path("config/restaurants") / f"{restaurant_id}.yaml"
@@ -129,8 +94,8 @@ def main():
     print("\nProssimi passi:")
     print(f"  1. Controlla il file generato, correggi se qualcosa non torna: {output_path}")
     print(f"  2. git add {output_path} && git commit -m 'Onboard {display_name}' && git push")
-    print("  3. Nessun nuovo secret GitHub necessario -- riusa le credenziali Google/Gmail gia' configurate")
-    print("  4. Verifica che la cartella Drive sia condivisa col service account (permesso Visualizzatore)")
+    print("  3. Nessun nuovo secret GitHub necessario -- riusa le credenziali Google gia' configurate")
+    print("  4. Verifica che le cartelle Drive siano condivise col service account (permesso Visualizzatore)")
 
 
 if __name__ == "__main__":
