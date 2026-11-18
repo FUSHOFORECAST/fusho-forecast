@@ -29,16 +29,20 @@ TABLE_ROWS = [
     ("Fatturato netto", "fatturato_netto", "eur", False, True),
     ("Costo tot. (netto IVA)", "costo_piattaforma_totale", "eur", False, False),
     ("Costo tot. (lordo IVA)", "costo_piattaforma_totale_lordo", "eur", False, False),
-    ("% costo tot.", "pct_costo_piattaforma_totale", "pct", True, False),
+    ("% costo tot. (netto IVA)", "pct_costo_piattaforma_totale", "pct", True, False),
+    ("% costo tot. (lordo IVA)", "pct_costo_piattaforma_totale_lordo", "pct", True, False),
     ("Commissioni (netto)", "commissione", "eur", False, True),
     ("Commissioni (lordo)", "commissione_lordo", "eur", False, False),
-    ("% commissioni", "pct_commissione", "pct", True, False),
+    ("% commissioni (netto IVA)", "pct_commissione", "pct", True, False),
+    ("% commissioni (lordo IVA)", "pct_commissione_lordo", "pct", True, False),
     ("Ads (netto)", "ads", "eur", False, True),
     ("Ads (lordo)", "ads_lordo", "eur", False, False),
-    ("% ads", "pct_ads", "pct", True, False),
+    ("% ads (netto IVA)", "pct_ads", "pct", True, False),
+    ("% ads (lordo IVA)", "pct_ads_lordo", "pct", True, False),
     ("Prime (netto)", "prime", "eur", False, True),
     ("Prime (lordo)", "prime_lordo", "eur", False, False),
-    ("% prime", "pct_prime", "pct", True, False),
+    ("% prime (netto IVA)", "pct_prime", "pct", True, False),
+    ("% prime (lordo IVA)", "pct_prime_lordo", "pct", True, False),
     ("Errori €", "errori", "eur", False, True),
     ("% errori", "pct_errori", "pct", True, False),
     ("Netto incassato (bonifico Glovo)", "importo_bonifico", "eur", False, True),
@@ -70,6 +74,15 @@ def _aggregate_by_month(invoices: list[dict]) -> dict[str, dict]:
         m["pct_sconti"] = (m["sconti"] / m["prodotti"] * 100) if m["prodotti"] else None
         for field in ["costo_piattaforma_totale", "commissione", "ads", "prime", "errori"]:
             m[f"pct_{field}"] = (m[field] / m["fatturato_netto"] * 100) if m["fatturato_netto"] else None
+        # Stesso fatturato (quello che batti in cassa, gia' IVA inclusa) a
+        # denominatore: qui uso il costo lordo IVA al numeratore, cosi' chi
+        # legge vede sia l'incidenza "sulla carta" (netto IVA) sia quella
+        # sui soldi che escono davvero dal conto (lordo IVA). Niente aliquota
+        # IVA sul cibo da scorporare: e' una scelta esplicita, non un calcolo
+        # fiscalmente "giusto" in senso stretto (le due IVA, 10% food e 22%
+        # servizi, restano diverse) ma e' quello che l'utente ha chiesto.
+        for field in ["costo_piattaforma_totale", "commissione", "ads", "prime"]:
+            m[f"pct_{field}_lordo"] = (m[f"{field}_lordo"] / m["fatturato_netto"] * 100) if m["fatturato_netto"] else None
 
     return by_month
 
@@ -121,7 +134,8 @@ def build_delivery_costs_report(config: RestaurantConfig, year: int | None = Non
         f"{_month_label(months[-1])}: fatturato netto {_fmt_eur(last['fatturato_netto'])}, "
         f"costo totale piattaforma {_fmt_eur(last['costo_piattaforma_totale'])} netto IVA / "
         f"{_fmt_eur(last['costo_piattaforma_totale_lordo'])} lordo IVA "
-        f"({_fmt_pct(last['pct_costo_piattaforma_totale'])}) — "
+        f"({_fmt_pct(last['pct_costo_piattaforma_totale'])} netto IVA — "
+        f"{_fmt_pct(last['pct_costo_piattaforma_totale_lordo'])} lordo IVA) — "
         f"netto incassato (bonifico Glovo): {_fmt_eur(last['importo_bonifico'])}."
     )
 
@@ -136,10 +150,15 @@ def build_delivery_costs_report(config: RestaurantConfig, year: int | None = Non
   <p style="color:#777;font-size:11px;margin-top:16px;">
     Netto/lordo IVA: commissioni, ads e prime hanno sia l'importo netto IVA (come in fattura) sia il
     lordo IVA (netto + IVA, aliquota letta dalla fattura). Errori resta un unico importo (blocco di
-    riconciliazione, senza IVA propria). Le percentuali sono calcolate sul fatturato netto (importi
-    netto IVA), tranne % sconti che e' su prodotti/fatturato lordo. <b>Netto incassato</b> e' l'importo
-    del bonifico che Glovo versa davvero in banca, gia' al netto di tutti i costi (commissioni, ads,
-    prime, errori, lordo IVA) -- il numero di fondo di tutta la tabella.
+    riconciliazione, senza IVA propria). <b>Fatturato netto</b> (prodotti − sconti) e' gia' IVA inclusa:
+    e' l'incasso di cassa, al netto solo degli sconti finanziati al ristorante. Ogni voce di costo ha
+    quindi due percentuali sullo stesso fatturato di cassa: "netto IVA" (il costo come scritto in
+    fattura, IVA servizi esclusa) e "lordo IVA" (con l'IVA servizi inclusa, cioe' i soldi che escono
+    davvero dal conto) -- le due aliquote (IVA food e IVA servizi) restano diverse, quindi sono due letture
+    dello stesso costo, non un confronto "a pari IVA". % sconti resta su prodotti/fatturato lordo (prima
+    degli sconti), non ha componente IVA. <b>Netto incassato</b> e' l'importo del bonifico che Glovo versa
+    davvero in banca, gia' al netto di tutti i costi (commissioni, ads, prime, errori, lordo IVA) -- il
+    numero di fondo di tutta la tabella.
   </p>
 </div>
 """

@@ -215,10 +215,12 @@ def parse_invoice_pdf(path: Path) -> dict:
 
     prodotti = raw.get("prodotti", 0.0)
     sconti = sum_fields(SCONTI_FIELDS)
-    # "Prodotti" e' il fatturato lordo dei prodotti venduti tramite Glovo
-    # (prima di IVA); il fatturato netto sottrae solo gli sconti/promozioni
-    # che il ristorante ha finanziato -- non commissioni/ads/errori, che sono
-    # costi sul fatturato netto, non riduzioni del fatturato stesso.
+    # "Prodotti" e' il valore degli ordini venduti tramite Glovo, IVA food
+    # gia' inclusa (e' quello che il ristorante batte in cassa): confermato
+    # col ristorante, non e' "prima di IVA". Il fatturato netto sottrae solo
+    # gli sconti/promozioni che il ristorante ha finanziato -- non
+    # commissioni/ads/errori, che sono costi sul fatturato netto, non
+    # riduzioni del fatturato stesso.
     fatturato_netto = round(prodotti - sconti, 2)
     commissione = sum_fields(COMMISSIONE_FIELDS)
     ads = sum_fields(ADS_FIELDS)
