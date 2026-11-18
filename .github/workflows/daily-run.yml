@@ -55,4 +55,5 @@ jobs:
           path: |
             logs/
             reports/
+            data/*/processed/
           retention-days: 30
