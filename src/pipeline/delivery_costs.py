@@ -119,10 +119,10 @@ def _delivery_costs_state_id(restaurant_id: str) -> str:
     evita di sovrascrivere lo stato di altri flussi dati. Il suffisso
     numerico forza un riparsing completo di tutte le fatture quando cambia lo
     schema dei campi salvati (v2: separazione sconti/ads + fatturato netto;
-    v3: separazione ads/prime) -- altrimenti la cache di stato su GitHub
-    Actions terrebbe per sempre i record vecchi, dato che il riparsing scatta
-    solo sui filename nuovi."""
-    return f"{restaurant_id}_glovo_v3"
+    v3: separazione ads/prime; v4: costo_piattaforma_totale) -- altrimenti la
+    cache di stato su GitHub Actions terrebbe per sempre i record vecchi,
+    dato che il riparsing scatta solo sui filename nuovi."""
+    return f"{restaurant_id}_glovo_v4"
 
 
 def _find_invoice_pdfs(service, folder_id: str) -> list[dict]:
@@ -218,6 +218,15 @@ def parse_invoice_pdf(path: Path) -> dict:
     # che il ristorante ha finanziato -- non commissioni/ads/errori, che sono
     # costi sul fatturato netto, non riduzioni del fatturato stesso.
     fatturato_netto = round(prodotti - sconti, 2)
+    commissione = sum_fields(COMMISSIONE_FIELDS)
+    ads = sum_fields(ADS_FIELDS)
+    prime = sum_fields(PRIME_FIELDS)
+    errori = sum_fields(ERRORI_FIELDS)
+    # Costo totale che il ristorante paga a Glovo per l'uso della
+    # piattaforma (commissioni + ads + prime + errori + altro): tutto cio'
+    # che non e' "sconti" (che riduce il fatturato stesso, non e' un costo
+    # sul fatturato) ne' una voce "meta" di riepilogo/bonifico.
+    costo_piattaforma_totale = round(commissione + ads + prime + errori + altro, 2)
 
     return {
         "filename": path.name,
@@ -227,11 +236,12 @@ def parse_invoice_pdf(path: Path) -> dict:
         "prodotti": prodotti,
         "sconti": sconti,
         "fatturato_netto": fatturato_netto,
-        "commissione": sum_fields(COMMISSIONE_FIELDS),
-        "ads": sum_fields(ADS_FIELDS),
-        "prime": sum_fields(PRIME_FIELDS),
-        "errori": sum_fields(ERRORI_FIELDS),
+        "commissione": commissione,
+        "ads": ads,
+        "prime": prime,
+        "errori": errori,
         "altro": altro,
+        "costo_piattaforma_totale": costo_piattaforma_totale,
         "totale_fattura": raw.get("totale_fattura"),
         "importo_bonifico": raw.get("importo_bonifico"),
         "raw": raw,
@@ -252,7 +262,8 @@ def _save_glovo_record(restaurant_id: str, filename: str, record: dict) -> None:
 _INVOICE_FIELDS = [
     "filename", "invoice_number", "period_start", "period_end",
     "prodotti", "sconti", "fatturato_netto",
-    "commissione", "ads", "prime", "errori", "altro", "totale_fattura", "importo_bonifico",
+    "commissione", "ads", "prime", "errori", "altro", "costo_piattaforma_totale",
+    "totale_fattura", "importo_bonifico",
 ]
 
 
@@ -274,7 +285,8 @@ def _aggregate_monthly(config: RestaurantConfig, records: dict[str, dict]) -> No
     monthly: dict[str, dict] = {}
     money_fields = [
         "prodotti", "sconti", "fatturato_netto",
-        "commissione", "ads", "prime", "errori", "altro", "totale_fattura", "importo_bonifico",
+        "commissione", "ads", "prime", "errori", "altro", "costo_piattaforma_totale",
+        "totale_fattura", "importo_bonifico",
     ]
 
     for record in records.values():
