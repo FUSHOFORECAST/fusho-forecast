@@ -39,6 +39,9 @@ events:
 notify:
   recipient_email: "davidecroatto1992@gmail.com"
 
+delivery_costs:
+  glovo_folder_id: "1DwYNpzRjqhXDsPQs50R9XiEwRwROdWJ9"
+
 features:
   lags: [1, 7, 14, 21, 28, 30]
   rolling_windows: [7, 14, 30]

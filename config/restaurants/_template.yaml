@@ -47,6 +47,10 @@ events:
   manual_events_path: null          # percorso opzionale a un CSV eventi manuali; null per saltare
   # Schema richiesto se presente: start_date,end_date,event_name,event_type,impact
 
+delivery_costs:
+  glovo_folder_id: null              # ID cartella Drive con le fatture Glovo del ristorante (sottocartelle AAAA/MM
+                                      # con i PDF fattura), null per disattivare. Stessa condivisione di food_cost.
+
 features:
   lags: [1, 7, 14, 21, 28, 30]
   rolling_windows: [7, 14, 30]

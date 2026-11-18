@@ -7,6 +7,7 @@ from datetime import datetime
 from pathlib import Path
 
 from src.pipeline.config import list_restaurant_configs, load_restaurant_config
+from src.pipeline.delivery_costs import run_delivery_costs_pipeline
 from src.pipeline.notify import send_email
 from src.pipeline.report import build_html_report
 from src.pipeline.run import run_pipeline
@@ -55,6 +56,20 @@ def run_one(config_path: Path):
         if remote_signature is not None:
             save_signature(restaurant_id, remote_signature)
 
+    # I costi delivery (fatture Glovo) sono un flusso dati indipendente dal
+    # forecast, isolato nel proprio try/except -- un fallimento qui non deve
+    # far risultare FALLITO il run del ristorante se il forecast e' comunque
+    # andato a buon fine.
+    if config.delivery_costs.glovo_folder_id:
+        try:
+            with redirect_stdout(buffer):
+                result = run_delivery_costs_pipeline(config)
+                print(f"Delivery costs: {result}")
+        except Exception:
+            buffer.write("\nAVVISO: pipeline delivery costs fallita (run comunque valido):\n")
+            buffer.write(traceback.format_exc())
+
+    if success and not skipped:
         if config.notify.recipient_email:
             try:
                 with redirect_stdout(buffer):

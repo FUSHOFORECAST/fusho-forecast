@@ -77,6 +77,7 @@ def build_config(
         "audit": {"total_row_label": DEFAULT_TOTAL_ROW_LABEL, "tolerance": DEFAULT_AUDIT_TOLERANCE},
         "events": {"manual_events_path": None},
         "notify": {"recipient_email": recipient_email or None},
+        "delivery_costs": {"glovo_folder_id": None},
         "features": {"lags": [1, 7, 14, 21, 28, 30], "rolling_windows": [7, 14, 30], "trend_windows": [7, 30]},
         "forecast": {"horizon_days": 31, "backtest_days": 60},
         "model": {

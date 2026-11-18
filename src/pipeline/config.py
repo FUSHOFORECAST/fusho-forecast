@@ -42,6 +42,11 @@ class NotifyConfig:
 
 
 @dataclasses.dataclass(frozen=True)
+class DeliveryCostsConfig:
+    glovo_folder_id: str | None = None
+
+
+@dataclasses.dataclass(frozen=True)
 class FeaturesConfig:
     lags: list[int] = dataclasses.field(default_factory=lambda: [1, 7, 14, 21, 28, 30])
     rolling_windows: list[int] = dataclasses.field(default_factory=lambda: [7, 14, 30])
@@ -72,6 +77,7 @@ class RestaurantConfig:
     audit: AuditConfig
     events: EventsConfig
     notify: NotifyConfig
+    delivery_costs: DeliveryCostsConfig
     features: FeaturesConfig
     forecast: ForecastConfig
     model: ModelConfig
@@ -84,6 +90,10 @@ class RestaurantConfig:
     @property
     def raw_dir(self) -> Path:
         return Path(self.data_source.raw_path)
+
+    @property
+    def raw_glovo_dir(self) -> Path:
+        return Path(f"data/{self.restaurant_id}/raw_glovo")
 
     @property
     def processed_dir(self) -> Path:
@@ -116,6 +126,7 @@ def load_restaurant_config(path: str | Path) -> RestaurantConfig:
     audit = AuditConfig(**raw.get("audit", {}))
     events = EventsConfig(**raw.get("events", {}))
     notify = NotifyConfig(**raw.get("notify", {}))
+    delivery_costs = DeliveryCostsConfig(**raw.get("delivery_costs", {}))
     features = FeaturesConfig(**raw.get("features", {}))
     forecast = ForecastConfig(**raw.get("forecast", {}))
     model = ModelConfig(**raw.get("model", {}))
@@ -147,6 +158,7 @@ def load_restaurant_config(path: str | Path) -> RestaurantConfig:
         audit=audit,
         events=events,
         notify=notify,
+        delivery_costs=delivery_costs,
         features=features,
         forecast=forecast,
         model=model,
