@@ -1,4 +1,5 @@
 import io
+import os
 import sys
 import time
 import traceback
@@ -53,9 +54,11 @@ def run_one(config_path: Path):
             buffer.write("\nERRORE: pipeline delivery costs fallita:\n" + error_message)
         else:
             # Pubblica il PDF aggiornato su Drive solo se sono arrivate fatture
-            # nuove -- un fallimento qui non invalida il run (i dati sono gia'
-            # salvi), e' solo il report "bello" a non essersi aggiornato.
-            if result.get("n_new_invoices"):
+            # nuove (o se richiesto a mano via FORCE_REPORT_PUBLISH, es. dopo
+            # una modifica al formato del report, da workflow_dispatch) --
+            # un fallimento qui non invalida il run (i dati sono gia' salvi),
+            # e' solo il report "bello" a non essersi aggiornato.
+            if result.get("n_new_invoices") or os.environ.get("FORCE_REPORT_PUBLISH") == "true":
                 try:
                     with redirect_stdout(buffer):
                         file_id = publish_delivery_costs_report(config)

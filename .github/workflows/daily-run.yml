@@ -6,7 +6,12 @@ on:
     # Settimanale: restano solo food cost (DDT) e costi delivery (fatture Glovo,
     # che arrivano ogni due settimane), non serve piu' girare ogni giorno.
     - cron: "0 5 * * 1"
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      force_report:
+        description: "Forza la pubblicazione del report Drive anche senza fatture nuove (es. dopo una modifica al formato)"
+        type: boolean
+        default: false
 
 jobs:
   run:
@@ -43,6 +48,7 @@ jobs:
           GOOGLE_APPLICATION_CREDENTIALS: /tmp/gcp-key.json
           GOOGLE_OAUTH_CREDENTIALS: /tmp/gcp-oauth.json
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          FORCE_REPORT_PUBLISH: ${{ inputs.force_report }}
         run: python -m src.pipeline.run_all
 
       - name: Salva stato sincronizzazione aggiornato
