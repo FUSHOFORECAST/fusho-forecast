@@ -41,6 +41,19 @@ jobs:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: python -m src.pipeline.run_all
 
+      - name: "TEST UNA TANTUM: forza pubblicazione report Drive per verificare l'automazione"
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: /tmp/gcp-key.json
+        run: |
+          mkdir -p logs
+          python -c "
+          from src.pipeline.config import load_restaurant_config
+          from src.pipeline.delivery_costs_report import publish_delivery_costs_report
+          config = load_restaurant_config('config/restaurants/fusho.yaml')
+          file_id = publish_delivery_costs_report(config)
+          print('Drive file id:', file_id)
+          " 2>&1 | tee logs/test_drive_publish.log
+
       - name: Salva stato sincronizzazione aggiornato
         if: always()
         uses: actions/cache/save@v4
