@@ -81,7 +81,8 @@ def main():
         "\nID di una cartella Google Drive dedicata al brand (es. 'Report Delivery/NOME_BRAND', "
         "diversa da quella delle fatture) dove la pipeline carica il PDF dei margini delivery, "
         "vuoto per disattivare. Dentro crea/aggiorna da sola una sottocartella per anno. "
-        "Il service account deve avere permesso Editor (non solo Visualizzatore) su questa."
+        "La scrittura usa le tue credenziali OAuth (non il service account), quindi basta che "
+        "sia una cartella tua -- non va condivisa con nessuno."
     )
     report_folder_id = ask("ID cartella report", "")
 
@@ -108,7 +109,7 @@ def main():
     print(f"  2. git add {output_path} && git commit -m 'Onboard {display_name}' && git push")
     print("  3. Nessun nuovo secret GitHub necessario -- riusa le credenziali Google gia' configurate")
     print("  4. Verifica che le cartelle DDT/Glovo siano condivise col service account (permesso Visualizzatore)")
-    print("  5. La cartella report va condivisa col service account con permesso Editor (deve poterci scrivere)")
+    print("  5. La cartella report non va condivisa con nessuno: la scrittura usa le tue credenziali OAuth")
 
 
 if __name__ == "__main__":

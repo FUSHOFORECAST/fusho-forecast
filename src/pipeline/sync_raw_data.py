@@ -33,6 +33,37 @@ def _build_drive_service():
     return build("drive", "v3", credentials=credentials)
 
 
+def _build_drive_oauth_service():
+    """Account di servizio su Drive personale (non Workspace) non ha quota di
+    storage, quindi non puo' creare/possedere file -- solo leggere da cartelle
+    condivise. Per caricare il report usiamo invece le credenziali OAuth del
+    proprietario del Drive (generate una tantum con ops/get_drive_oauth_token.py),
+    cosi' il file e' suo fin dall'inizio e non serve nessuna quota del service
+    account."""
+    import json
+
+    from google.oauth2.credentials import Credentials
+    from googleapiclient.discovery import build
+
+    creds_json = os.environ.get("GOOGLE_OAUTH_CREDENTIALS")
+    if not creds_json:
+        raise RuntimeError(
+            "GOOGLE_OAUTH_CREDENTIALS non impostata: serve il JSON con client_id, "
+            "client_secret e refresh_token (vedi ops/get_drive_oauth_token.py)."
+        )
+
+    data = json.loads(Path(creds_json).read_text()) if Path(creds_json).exists() else json.loads(creds_json)
+    credentials = Credentials(
+        None,
+        refresh_token=data["refresh_token"],
+        client_id=data["client_id"],
+        client_secret=data["client_secret"],
+        token_uri="https://oauth2.googleapis.com/token",
+        scopes=DRIVE_SCOPES,
+    )
+    return build("drive", "v3", credentials=credentials)
+
+
 def _effective_filename(file: dict) -> str:
     """Nome del file una volta scaricato: per i file nativi Google Workspace
     aggiunge l'estensione del formato di esportazione (assente nel nome originale)."""

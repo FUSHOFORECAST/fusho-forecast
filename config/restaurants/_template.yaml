@@ -23,6 +23,6 @@ delivery_costs:
                                       # diversa da quella delle fatture) dove la pipeline carica il PDF dei margini
                                       # delivery, null per disattivare. Dentro crea/aggiorna da sola una sottocartella
                                       # per anno (2026, 2027, ...), un PDF per anno sempre aggiornato con l'ultimo
-                                      # dato. Il service account deve avere permesso Editor (non solo Visualizzatore)
-                                      # su questa cartella -- condividerla cosi' basta, i permessi si propagano alle
-                                      # sottocartelle create in automatico.
+                                      # dato. La scrittura usa le credenziali OAuth del proprietario del Drive (non
+                                      # il service account, che su Drive personale non ha quota per creare file),
+                                      # quindi non serve condividerla con nessuno: basta che sia una cartella tua.

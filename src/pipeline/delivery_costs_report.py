@@ -191,9 +191,11 @@ def publish_delivery_costs_report(config: RestaurantConfig) -> str | None:
     pdf_path = config.processed_path("margini_delivery_glovo.pdf")
     render_html_to_pdf(html, pdf_path)
 
-    from src.pipeline.sync_raw_data import _build_drive_service, _find_or_create_subfolder, upload_file_to_drive
+    from src.pipeline.sync_raw_data import _build_drive_oauth_service, _find_or_create_subfolder, upload_file_to_drive
 
-    service = _build_drive_service()
+    # Scrittura con le credenziali OAuth del proprietario del Drive (non il
+    # service account: su Drive personale non ha quota per possedere file).
+    service = _build_drive_oauth_service()
     year_folder_id = _find_or_create_subfolder(service, config.delivery_costs.report_folder_id, str(year))
     file_id = upload_file_to_drive(service, year_folder_id, pdf_path, "Margini Delivery Glovo.pdf")
     return file_id
