@@ -8,6 +8,7 @@ from pathlib import Path
 
 from src.pipeline.config import list_restaurant_configs, load_restaurant_config
 from src.pipeline.delivery_costs import run_delivery_costs_pipeline
+from src.pipeline.delivery_costs_report import publish_delivery_costs_report
 from src.pipeline.food_cost import run_food_cost_pipeline
 
 LOGS_DIR = Path("logs")
@@ -50,6 +51,18 @@ def run_one(config_path: Path):
             success = False
             error_message = traceback.format_exc()
             buffer.write("\nERRORE: pipeline delivery costs fallita:\n" + error_message)
+        else:
+            # Pubblica il PDF aggiornato su Drive solo se sono arrivate fatture
+            # nuove -- un fallimento qui non invalida il run (i dati sono gia'
+            # salvi), e' solo il report "bello" a non essersi aggiornato.
+            if result.get("n_new_invoices"):
+                try:
+                    with redirect_stdout(buffer):
+                        file_id = publish_delivery_costs_report(config)
+                        print(f"Report delivery pubblicato su Drive: {file_id}")
+                except Exception:
+                    buffer.write("\nAVVISO: pubblicazione report delivery su Drive fallita:\n")
+                    buffer.write(traceback.format_exc())
 
     duration = time.time() - start
     log_path.write_text(buffer.getvalue())

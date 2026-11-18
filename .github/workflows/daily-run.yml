@@ -21,6 +21,9 @@ jobs:
       - name: Installa dipendenze
         run: pip install -r requirements.txt
 
+      - name: Installa Chromium per la generazione PDF del report
+        run: playwright install --with-deps chromium
+
       - name: Scrivi credenziali Google service account
         run: echo '${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}' > /tmp/gcp-key.json
 

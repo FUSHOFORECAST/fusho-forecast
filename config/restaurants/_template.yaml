@@ -19,3 +19,10 @@ food_cost:
 delivery_costs:
   glovo_folder_id: null              # ID cartella Drive con le fatture Glovo del ristorante (sottocartelle AAAA/MM
                                       # con i PDF fattura), null per disattivare. Stessa condivisione di food_cost.
+  report_folder_id: null             # ID della cartella Drive DEDICATA al brand (es. "Report Delivery/FUSHO",
+                                      # diversa da quella delle fatture) dove la pipeline carica il PDF dei margini
+                                      # delivery, null per disattivare. Dentro crea/aggiorna da sola una sottocartella
+                                      # per anno (2026, 2027, ...), un PDF per anno sempre aggiornato con l'ultimo
+                                      # dato. Il service account deve avere permesso Editor (non solo Visualizzatore)
+                                      # su questa cartella -- condividerla cosi' basta, i permessi si propagano alle
+                                      # sottocartelle create in automatico.

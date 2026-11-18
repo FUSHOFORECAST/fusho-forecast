@@ -24,6 +24,7 @@ class FoodCostConfig:
 @dataclasses.dataclass(frozen=True)
 class DeliveryCostsConfig:
     glovo_folder_id: str | None = None
+    report_folder_id: str | None = None
 
 
 @dataclasses.dataclass(frozen=True)

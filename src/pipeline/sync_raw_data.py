@@ -1,7 +1,10 @@
 import fnmatch
 import os
+from pathlib import Path
 
-DRIVE_SCOPES = ["https://www.googleapis.com/auth/drive.readonly"]
+# Scope completo (non solo readonly): la pipeline ora scrive anche i report
+# PDF nella cartella Drive dedicata (vedi upload_file_to_drive).
+DRIVE_SCOPES = ["https://www.googleapis.com/auth/drive"]
 
 # I file "nativi" di Google Workspace (es. Google Sheets) non hanno un'estensione
 # nel nome e non si possono scaricare come binario grezzo -- vanno esportati in un
@@ -77,4 +80,49 @@ def _download_file(service, file: dict, destination) -> None:
         while not done:
             _, done = downloader.next_chunk()
 
+
+def _find_or_create_subfolder(service, parent_id: str, name: str) -> str:
+    """Cerca una sottocartella con questo nome dentro parent_id; se non esiste
+    la crea. Usata per organizzare i report per anno (parent/2026, parent/2027,
+    ...) senza bisogno di ritoccare la config ad ogni cambio di anno."""
+    query = (
+        f"'{parent_id}' in parents and trashed = false and "
+        f"mimeType = 'application/vnd.google-apps.folder' and name = '{name}'"
+    )
+    response = service.files().list(q=query, fields="files(id, name)").execute()
+    existing = response.get("files", [])
+    if existing:
+        return existing[0]["id"]
+
+    folder = service.files().create(
+        body={"name": name, "mimeType": "application/vnd.google-apps.folder", "parents": [parent_id]},
+        fields="id",
+    ).execute()
+    return folder["id"]
+
+
+def upload_file_to_drive(service, folder_id: str, local_path: Path, drive_filename: str) -> str:
+    """Carica local_path nella cartella folder_id col nome drive_filename.
+    Se un file con quel nome esiste gia' in quella cartella ne sostituisce il
+    contenuto (Drive conserva comunque lo storico versioni), altrimenti ne
+    crea uno nuovo. Ritorna l'id del file su Drive."""
+    from googleapiclient.http import MediaFileUpload
+
+    media = MediaFileUpload(str(local_path), resumable=False)
+
+    query = f"'{folder_id}' in parents and trashed = false and name = '{drive_filename}'"
+    response = service.files().list(q=query, fields="files(id, name)").execute()
+    existing = response.get("files", [])
+
+    if existing:
+        file_id = existing[0]["id"]
+        service.files().update(fileId=file_id, media_body=media).execute()
+        return file_id
+
+    created = service.files().create(
+        body={"name": drive_filename, "parents": [folder_id]},
+        media_body=media,
+        fields="id",
+    ).execute()
+    return created["id"]
 

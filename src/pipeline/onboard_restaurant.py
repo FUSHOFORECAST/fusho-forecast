@@ -30,6 +30,7 @@ def build_config(
     address: str,
     ddt_folder_id: str,
     glovo_folder_id: str,
+    report_folder_id: str,
 ) -> dict:
     return {
         "restaurant_id": restaurant_id,
@@ -43,7 +44,10 @@ def build_config(
             "address": address or None,
         },
         "food_cost": {"ddt_folder_id": ddt_folder_id or None},
-        "delivery_costs": {"glovo_folder_id": glovo_folder_id or None},
+        "delivery_costs": {
+            "glovo_folder_id": glovo_folder_id or None,
+            "report_folder_id": report_folder_id or None,
+        },
     }
 
 
@@ -73,9 +77,17 @@ def main():
     )
     glovo_folder_id = ask("ID cartella Glovo", "")
 
+    print(
+        "\nID di una cartella Google Drive dedicata al brand (es. 'Report Delivery/NOME_BRAND', "
+        "diversa da quella delle fatture) dove la pipeline carica il PDF dei margini delivery, "
+        "vuoto per disattivare. Dentro crea/aggiorna da sola una sottocartella per anno. "
+        "Il service account deve avere permesso Editor (non solo Visualizzatore) su questa."
+    )
+    report_folder_id = ask("ID cartella report", "")
+
     config = build_config(
         restaurant_id, display_name, city, country_code, latitude, longitude, timezone,
-        address, ddt_folder_id, glovo_folder_id,
+        address, ddt_folder_id, glovo_folder_id, report_folder_id,
     )
 
     output_path = Path("config/restaurants") / f"{restaurant_id}.yaml"
@@ -95,7 +107,8 @@ def main():
     print(f"  1. Controlla il file generato, correggi se qualcosa non torna: {output_path}")
     print(f"  2. git add {output_path} && git commit -m 'Onboard {display_name}' && git push")
     print("  3. Nessun nuovo secret GitHub necessario -- riusa le credenziali Google gia' configurate")
-    print("  4. Verifica che le cartelle Drive siano condivise col service account (permesso Visualizzatore)")
+    print("  4. Verifica che le cartelle DDT/Glovo siano condivise col service account (permesso Visualizzatore)")
+    print("  5. La cartella report va condivisa col service account con permesso Editor (deve poterci scrivere)")
 
 
 if __name__ == "__main__":
