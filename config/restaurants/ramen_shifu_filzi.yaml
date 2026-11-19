@@ -1,0 +1,13 @@
+restaurant_id: "ramen_shifu_filzi"
+display_name: "Ramen Shifu Filzi"
+
+location:
+  city: "Milano"
+  country_code: "IT"
+  latitude: 45.4642
+  longitude: 9.1900
+  timezone: "Europe/Rome"
+
+delivery_costs:
+  glovo_folder_id: "1s9V2iJawSm8mdqd2iTDyhH1aYmZh5OGP"
+  report_folder_id: "1IVvUdDep269viHD5bE7qYsHTN6mz6FNK"

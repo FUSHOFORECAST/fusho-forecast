@@ -1,0 +1,13 @@
+restaurant_id: "ramen_shifu_pacini"
+display_name: "Ramen Shifu Pacini"
+
+location:
+  city: "Milano"
+  country_code: "IT"
+  latitude: 45.4642
+  longitude: 9.1900
+  timezone: "Europe/Rome"
+
+delivery_costs:
+  glovo_folder_id: "1-a3GHvi-Itnetct9eYcZ5Wy076gu2Dtu"
+  report_folder_id: "1fRPyEVCnxLB_1lIOkhuEsei2fpXzWh2m"
