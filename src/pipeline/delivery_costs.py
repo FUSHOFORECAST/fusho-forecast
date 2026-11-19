@@ -120,10 +120,11 @@ def _delivery_costs_state_id(restaurant_id: str) -> str:
     numerico forza un riparsing completo di tutte le fatture quando cambia lo
     schema dei campi salvati (v2: separazione sconti/ads + fatturato netto;
     v3: separazione ads/prime; v4: costo_piattaforma_totale; v5: importi al
-    lordo IVA) -- altrimenti la cache di stato su GitHub Actions terrebbe per
-    sempre i record vecchi, dato che il riparsing scatta solo sui filename
-    nuovi."""
-    return f"{restaurant_id}_glovo_v5"
+    lordo IVA; v6: lettura multi-pagina, corregge l'importo del bonifico
+    mancante sulle fatture con voci di costo extra) -- altrimenti la cache di
+    stato su GitHub Actions terrebbe per sempre i record vecchi, dato che il
+    riparsing scatta solo sui filename nuovi."""
+    return f"{restaurant_id}_glovo_v6"
 
 
 def _find_invoice_pdfs(service, folder_id: str) -> list[dict]:
