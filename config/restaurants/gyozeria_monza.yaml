@@ -1,0 +1,13 @@
+restaurant_id: "gyozeria_monza"
+display_name: "La Gyozeria Monza"
+
+location:
+  city: "Monza"
+  country_code: "IT"
+  latitude: 45.5845
+  longitude: 9.2744
+  timezone: "Europe/Rome"
+
+delivery_costs:
+  glovo_folder_id: "18Br4Yw-ytGYP-MOoZ4yck3-Kr29L74Of"
+  report_folder_id: "1nUbOvKjPQubEwhnGbq3QVYMOd1tn5kHG"

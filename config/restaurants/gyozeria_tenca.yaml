@@ -1,0 +1,13 @@
+restaurant_id: "gyozeria_tenca"
+display_name: "La Gyozeria Tenca"
+
+location:
+  city: "Milano"
+  country_code: "IT"
+  latitude: 45.4642
+  longitude: 9.1900
+  timezone: "Europe/Rome"
+
+delivery_costs:
+  glovo_folder_id: "1Sr-xp7BYg6ORITsJEHmUd3HKQCOeTVga"
+  report_folder_id: "1fUQPMm9arIQYlKeLJGLJECyvAivuBYe7"
