@@ -49,6 +49,14 @@ LABEL_KEY_MAP = {
     "glovo già pagati": "glovo_gia_pagati",
     "debito accumulato": "debito_accumulato",
     "importo del bonifico": "importo_bonifico",
+    # Viste solo su alcune fatture (es. Ramen Shifu durante le campagne
+    # "offerta lampo" Glovo) -- assenti su FUSHO. "Costi per offerta lampo"
+    # e' nel blocco di costi in cima (sibling di commissioni/ads/prime);
+    # "Promozione lampo a carico del Partner" e' nel blocco di
+    # riconciliazione, stessa natura di "promo_prodotti" (sconto sul
+    # prodotto finanziato dal ristorante, non un costo sul fatturato).
+    "costi per offerta lampo": "offerta_lampo",
+    "promozione lampo a carico del partner": "promo_lampo",
 }
 
 # I bucket che l'utente vuole vedere, piu' "altro" per tutto cio' che non
@@ -65,7 +73,8 @@ LABEL_KEY_MAP = {
 COMMISSIONE_FIELDS = {"commissioni"}
 ADS_FIELDS = {"marketing_visibilita"}
 PRIME_FIELDS = {"supplemento_prime"}
-SCONTI_FIELDS = {"promo_consegna", "promo_prodotti"}
+OFFERTA_LAMPO_FIELDS = {"offerta_lampo"}
+SCONTI_FIELDS = {"promo_consegna", "promo_prodotti", "promo_lampo"}
 ERRORI_FIELDS = {"costo_incidenti_prodotti", "tariffa_attesa", "costo_annullamenti", "consegna_gratuita_incidente"}
 META_FIELDS = {
     "subtotale", "iva", "totale_fattura", "prodotti", "servizio_consegna",
@@ -78,7 +87,7 @@ META_FIELDS = {
 # vanno normalizzate in positivo prima di sommarle nei bucket, altrimenti un
 # "costo ads/errori" finirebbe per ridurre il totale invece di aumentarlo.
 RECONCILIATION_COST_FIELDS = {
-    "promo_prodotti", "costo_incidenti_prodotti", "tariffa_attesa",
+    "promo_prodotti", "promo_lampo", "costo_incidenti_prodotti", "tariffa_attesa",
     "costo_annullamenti", "consegna_gratuita_incidente",
 }
 
@@ -121,10 +130,12 @@ def _delivery_costs_state_id(restaurant_id: str) -> str:
     schema dei campi salvati (v2: separazione sconti/ads + fatturato netto;
     v3: separazione ads/prime; v4: costo_piattaforma_totale; v5: importi al
     lordo IVA; v6: lettura multi-pagina, corregge l'importo del bonifico
-    mancante sulle fatture con voci di costo extra) -- altrimenti la cache di
-    stato su GitHub Actions terrebbe per sempre i record vecchi, dato che il
-    riparsing scatta solo sui filename nuovi."""
-    return f"{restaurant_id}_glovo_v6"
+    mancante sulle fatture con voci di costo extra; v7: "offerta lampo"
+    mappata come voce propria invece di restare nascosta in "altro"/sconti
+    generici) -- altrimenti la cache di stato su GitHub Actions terrebbe per
+    sempre i record vecchi, dato che il riparsing scatta solo sui filename
+    nuovi."""
+    return f"{restaurant_id}_glovo_v7"
 
 
 def _find_invoice_pdfs(service, folder_id: str) -> list[dict]:
@@ -185,16 +196,25 @@ def parse_invoice_pdf(path: Path) -> dict:
 
     Il riepilogo di solito sta tutto in pagina 1, ma se la fattura ha voci di
     costo in piu' (es. "Promozione lampo", vista solo su alcuni locali) la
-    riga finale "Importo del bonifico"/"Debito accumulato" puo' slittare in
-    pagina 2 -- quindi si continua a leggere pagina per pagina finche' non la
-    si trova (o fino a un tetto di sicurezza, per non finire a leggere le
-    pagine di dettaglio ordini in fondo alla fattura)."""
+    riga finale "Importo del bonifico" puo' slittare in pagina 2 -- quindi si
+    continua a leggere pagina per pagina finche' non la si trova (o fino a un
+    tetto di sicurezza, per non finire a leggere le pagine di dettaglio
+    ordini in fondo alla fattura). Nota: "Debito accumulato" NON va bene come
+    segnale di stop -- e' una riga fissa della riconciliazione, stampata
+    sempre (anche a 0,00 €) gia' in pagina 1, non l'ultima riga della
+    fattura.
+
+    Le voci di costo extra viste solo su alcune fatture (es. "offerta
+    lampo") non vengono mai perse: finiscono comunque nel totale tramite
+    "altro"/RECONCILIATION_COST_FIELDS anche se non sono in LABEL_KEY_MAP --
+    ma se sono mappate esplicitamente (vedi LABEL_KEY_MAP) diventano visibili
+    come voce propria nel report invece di restare nascoste dentro "altro"."""
     import pdfplumber
 
     with pdfplumber.open(path) as pdf:
         text = pdf.pages[0].extract_text() or ""
         for page in pdf.pages[1:5]:
-            if re.search(r"importo del bonifico|debito accumulato", text, re.IGNORECASE):
+            if re.search(r"importo del bonifico", text, re.IGNORECASE):
                 break
             text += "\n" + (page.extract_text() or "")
 
@@ -222,7 +242,10 @@ def parse_invoice_pdf(path: Path) -> dict:
     def sum_fields(fields: set[str]) -> float:
         return round(sum(raw.get(f, 0.0) for f in fields), 2)
 
-    known_fields = COMMISSIONE_FIELDS | ADS_FIELDS | PRIME_FIELDS | SCONTI_FIELDS | ERRORI_FIELDS | META_FIELDS
+    known_fields = (
+        COMMISSIONE_FIELDS | ADS_FIELDS | PRIME_FIELDS | OFFERTA_LAMPO_FIELDS
+        | SCONTI_FIELDS | ERRORI_FIELDS | META_FIELDS
+    )
     altro = round(sum(v for k, v in raw.items() if k not in known_fields), 2)
 
     prodotti = raw.get("prodotti", 0.0)
@@ -237,6 +260,7 @@ def parse_invoice_pdf(path: Path) -> dict:
     commissione = sum_fields(COMMISSIONE_FIELDS)
     ads = sum_fields(ADS_FIELDS)
     prime = sum_fields(PRIME_FIELDS)
+    offerta_lampo = sum_fields(OFFERTA_LAMPO_FIELDS)
     errori = sum_fields(ERRORI_FIELDS)
 
     # IVA: commissione/ads/prime/altro vengono dal blocco in cima alla
@@ -257,14 +281,18 @@ def parse_invoice_pdf(path: Path) -> dict:
     commissione_lordo = round(commissione * iva_ratio, 2)
     ads_lordo = round(ads * iva_ratio, 2)
     prime_lordo = round(prime * iva_ratio, 2)
+    offerta_lampo_lordo = round(offerta_lampo * iva_ratio, 2)
     altro_lordo = round(altro * iva_ratio, 2)
 
     # Costo totale che il ristorante paga a Glovo per l'uso della
-    # piattaforma (commissioni + ads + prime + errori + altro): tutto cio'
-    # che non e' "sconti" (che riduce il fatturato stesso, non e' un costo
-    # sul fatturato) ne' una voce "meta" di riepilogo/bonifico.
-    costo_piattaforma_totale = round(commissione + ads + prime + errori + altro, 2)
-    costo_piattaforma_totale_lordo = round(commissione_lordo + ads_lordo + prime_lordo + errori + altro_lordo, 2)
+    # piattaforma (commissioni + ads + prime + offerta lampo + errori +
+    # altro): tutto cio' che non e' "sconti" (che riduce il fatturato
+    # stesso, non e' un costo sul fatturato) ne' una voce "meta" di
+    # riepilogo/bonifico.
+    costo_piattaforma_totale = round(commissione + ads + prime + offerta_lampo + errori + altro, 2)
+    costo_piattaforma_totale_lordo = round(
+        commissione_lordo + ads_lordo + prime_lordo + offerta_lampo_lordo + errori + altro_lordo, 2
+    )
 
     return {
         "filename": path.name,
@@ -280,6 +308,8 @@ def parse_invoice_pdf(path: Path) -> dict:
         "ads_lordo": ads_lordo,
         "prime": prime,
         "prime_lordo": prime_lordo,
+        "offerta_lampo": offerta_lampo,
+        "offerta_lampo_lordo": offerta_lampo_lordo,
         "errori": errori,
         "altro": altro,
         "altro_lordo": altro_lordo,
@@ -307,6 +337,7 @@ _INVOICE_FIELDS = [
     "filename", "invoice_number", "period_start", "period_end",
     "prodotti", "sconti", "fatturato_netto",
     "commissione", "commissione_lordo", "ads", "ads_lordo", "prime", "prime_lordo",
+    "offerta_lampo", "offerta_lampo_lordo",
     "errori", "altro", "altro_lordo",
     "costo_piattaforma_totale", "costo_piattaforma_totale_lordo", "iva_servizi",
     "totale_fattura", "importo_bonifico",
@@ -332,6 +363,7 @@ def _aggregate_monthly(config: RestaurantConfig, records: dict[str, dict]) -> No
     money_fields = [
         "prodotti", "sconti", "fatturato_netto",
         "commissione", "commissione_lordo", "ads", "ads_lordo", "prime", "prime_lordo",
+        "offerta_lampo", "offerta_lampo_lordo",
         "errori", "altro", "altro_lordo",
         "costo_piattaforma_totale", "costo_piattaforma_totale_lordo", "iva_servizi",
         "totale_fattura", "importo_bonifico",

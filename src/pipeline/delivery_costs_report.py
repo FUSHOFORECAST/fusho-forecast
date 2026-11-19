@@ -18,6 +18,7 @@ MONTHS_IT = [
 SUM_FIELDS = [
     "prodotti", "sconti", "fatturato_netto",
     "commissione", "commissione_lordo", "ads", "ads_lordo", "prime", "prime_lordo",
+    "offerta_lampo", "offerta_lampo_lordo",
     "errori", "costo_piattaforma_totale", "costo_piattaforma_totale_lordo", "importo_bonifico",
 ]
 
@@ -43,6 +44,10 @@ TABLE_ROWS = [
     ("Prime (lordo)", "prime_lordo", "eur", False, False),
     ("% prime (netto IVA)", "pct_prime", "pct", True, False),
     ("% prime (lordo IVA)", "pct_prime_lordo", "pct", True, False),
+    ("Offerta lampo (netto)", "offerta_lampo", "eur", False, True),
+    ("Offerta lampo (lordo)", "offerta_lampo_lordo", "eur", False, False),
+    ("% offerta lampo (netto IVA)", "pct_offerta_lampo", "pct", True, False),
+    ("% offerta lampo (lordo IVA)", "pct_offerta_lampo_lordo", "pct", True, False),
     ("Errori €", "errori", "eur", False, True),
     ("% errori", "pct_errori", "pct", True, False),
     ("Netto incassato (bonifico Glovo)", "importo_bonifico", "eur", False, True),
@@ -83,7 +88,7 @@ def _aggregate_by_month(invoices: list[dict]) -> dict[str, dict]:
 
     for m in by_month.values():
         m["pct_sconti"] = (m["sconti"] / m["prodotti"] * 100) if m["prodotti"] else None
-        for field in ["costo_piattaforma_totale", "commissione", "ads", "prime", "errori"]:
+        for field in ["costo_piattaforma_totale", "commissione", "ads", "prime", "offerta_lampo", "errori"]:
             m[f"pct_{field}"] = (m[field] / m["fatturato_netto"] * 100) if m["fatturato_netto"] else None
         # Stesso fatturato (quello che batti in cassa, gia' IVA inclusa) a
         # denominatore: qui uso il costo lordo IVA al numeratore, cosi' chi
@@ -92,7 +97,7 @@ def _aggregate_by_month(invoices: list[dict]) -> dict[str, dict]:
         # IVA sul cibo da scorporare: e' una scelta esplicita, non un calcolo
         # fiscalmente "giusto" in senso stretto (le due IVA, 10% food e 22%
         # servizi, restano diverse) ma e' quello che l'utente ha chiesto.
-        for field in ["costo_piattaforma_totale", "commissione", "ads", "prime"]:
+        for field in ["costo_piattaforma_totale", "commissione", "ads", "prime", "offerta_lampo"]:
             m[f"pct_{field}_lordo"] = (m[f"{field}_lordo"] / m["fatturato_netto"] * 100) if m["fatturato_netto"] else None
 
     return by_month
@@ -159,9 +164,11 @@ def build_delivery_costs_report(config: RestaurantConfig, year: int | None = Non
     <tbody>{"".join(body_rows)}</tbody>
   </table>
   <p style="color:#777;font-size:11px;margin-top:16px;">
-    Netto/lordo IVA: commissioni, ads e prime hanno sia l'importo netto IVA (come in fattura) sia il
-    lordo IVA (netto + IVA, aliquota letta dalla fattura). Errori resta un unico importo (blocco di
-    riconciliazione, senza IVA propria). <b>Fatturato netto</b> (prodotti − sconti) e' gia' IVA inclusa:
+    Netto/lordo IVA: commissioni, ads, prime e offerta lampo hanno sia l'importo netto IVA (come in
+    fattura) sia il lordo IVA (netto + IVA, aliquota letta dalla fattura) -- "Offerta lampo" (costo per le
+    campagne promozionali Glovo, vista solo su alcuni ristoranti/periodi) compare come riga propria invece
+    di restare nascosta dentro "altro". Errori resta un unico importo (blocco di riconciliazione, senza
+    IVA propria). <b>Fatturato netto</b> (prodotti − sconti) e' gia' IVA inclusa:
     e' l'incasso di cassa, al netto solo degli sconti finanziati al ristorante. Ogni voce di costo ha
     quindi due percentuali sullo stesso fatturato di cassa: "netto IVA" (il costo come scritto in
     fattura, IVA servizi esclusa) e "lordo IVA" (con l'IVA servizi inclusa, cioe' i soldi che escono
