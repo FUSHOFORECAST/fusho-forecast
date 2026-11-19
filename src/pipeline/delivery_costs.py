@@ -176,15 +176,26 @@ def sync_glovo_invoices(config: RestaurantConfig) -> list[Path]:
 
 
 def parse_invoice_pdf(path: Path) -> dict:
-    """Estrae dalla prima pagina (il riepilogo) di una fattura Glovo tutte le
-    voci 'etichetta valore €', e le aggrega nei bucket richiesti
+    """Estrae dalle pagine iniziali (il riepilogo) di una fattura Glovo tutte
+    le voci 'etichetta valore €', e le aggrega nei bucket richiesti
     (commissione/ads/prime/errori/altro), ciascuno anche al lordo IVA dove la
     fattura fornisce la scomposizione. Parser deterministico su testo
-    (pdfplumber), non un LLM: il layout del riepilogo e' fisso."""
+    (pdfplumber), non un LLM: il layout del riepilogo e' fisso.
+
+    Il riepilogo di solito sta tutto in pagina 1, ma se la fattura ha voci di
+    costo in piu' (es. "Promozione lampo", vista solo su alcuni locali) la
+    riga finale "Importo del bonifico"/"Debito accumulato" puo' slittare in
+    pagina 2 -- quindi si continua a leggere pagina per pagina finche' non la
+    si trova (o fino a un tetto di sicurezza, per non finire a leggere le
+    pagine di dettaglio ordini in fondo alla fattura)."""
     import pdfplumber
 
     with pdfplumber.open(path) as pdf:
         text = pdf.pages[0].extract_text() or ""
+        for page in pdf.pages[1:5]:
+            if re.search(r"importo del bonifico|debito accumulato", text, re.IGNORECASE):
+                break
+            text += "\n" + (page.extract_text() or "")
 
     invoice_match = INVOICE_NUM_RE.search(text)
     period_match = PERIOD_RE.search(text)

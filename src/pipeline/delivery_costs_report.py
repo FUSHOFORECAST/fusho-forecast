@@ -62,13 +62,24 @@ def _month_label(ym: str) -> str:
     return f"{MONTHS_IT[int(mo) - 1]} {y}"
 
 
+def _num(v) -> float:
+    """Il bonifico (o le altre voci meta) possono mancare del tutto su una
+    fattura quando quel periodo il ristorante va in debito con Glovo invece
+    di ricevere un pagamento -- non e' un errore di parsing, e' lo stato
+    della fattura stessa. Trattato come 0 invece di far fallire il report."""
+    try:
+        return float(v)
+    except (TypeError, ValueError):
+        return 0.0
+
+
 def _aggregate_by_month(invoices: list[dict]) -> dict[str, dict]:
     by_month: dict[str, dict] = defaultdict(lambda: defaultdict(float))
     for row in invoices:
         month = row["period_start"][:7]
         m = by_month[month]
         for field in SUM_FIELDS:
-            m[field] += float(row[field])
+            m[field] += _num(row[field])
 
     for m in by_month.values():
         m["pct_sconti"] = (m["sconti"] / m["prodotti"] * 100) if m["prodotti"] else None
