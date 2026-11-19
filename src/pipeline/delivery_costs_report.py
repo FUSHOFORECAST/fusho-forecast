@@ -51,6 +51,7 @@ TABLE_ROWS = [
     ("Errori €", "errori", "eur", False, True),
     ("% errori", "pct_errori", "pct", True, False),
     ("Netto incassato (bonifico Glovo)", "importo_bonifico", "eur", False, True),
+    ("% netto incassato / fatturato lordo", "pct_netto_incassato", "pct", True, False),
 ]
 
 
@@ -88,6 +89,12 @@ def _aggregate_by_month(invoices: list[dict]) -> dict[str, dict]:
 
     for m in by_month.values():
         m["pct_sconti"] = (m["sconti"] / m["prodotti"] * 100) if m["prodotti"] else None
+        # Quanto resta davvero in banca (bonifico Glovo, gia' al netto di
+        # sconti e di tutti i costi) per ogni euro battuto in cassa (prima
+        # di sconti/costi) -- la sintesi di tutta la tabella in un numero
+        # solo. Un unico valore (non netto/lordo IVA): il bonifico e' gia'
+        # l'importo reale finale, non una voce scomponibile per IVA.
+        m["pct_netto_incassato"] = (m["importo_bonifico"] / m["prodotti"] * 100) if m["prodotti"] else None
         for field in ["costo_piattaforma_totale", "commissione", "ads", "prime", "offerta_lampo", "errori"]:
             m[f"pct_{field}"] = (m[field] / m["fatturato_netto"] * 100) if m["fatturato_netto"] else None
         # Stesso fatturato (quello che batti in cassa, gia' IVA inclusa) a
@@ -152,7 +159,8 @@ def build_delivery_costs_report(config: RestaurantConfig, year: int | None = Non
         f"{_fmt_eur(last['costo_piattaforma_totale_lordo'])} lordo IVA "
         f"({_fmt_pct(last['pct_costo_piattaforma_totale'])} netto IVA — "
         f"{_fmt_pct(last['pct_costo_piattaforma_totale_lordo'])} lordo IVA) — "
-        f"netto incassato (bonifico Glovo): {_fmt_eur(last['importo_bonifico'])}."
+        f"netto incassato (bonifico Glovo): {_fmt_eur(last['importo_bonifico'])} "
+        f"({_fmt_pct(last['pct_netto_incassato'])} del fatturato lordo)."
     )
 
     html = f"""\
@@ -176,7 +184,9 @@ def build_delivery_costs_report(config: RestaurantConfig, year: int | None = Non
     dello stesso costo, non un confronto "a pari IVA". % sconti resta su prodotti/fatturato lordo (prima
     degli sconti), non ha componente IVA. <b>Netto incassato</b> e' l'importo del bonifico che Glovo versa
     davvero in banca, gia' al netto di tutti i costi (commissioni, ads, prime, errori, lordo IVA) -- il
-    numero di fondo di tutta la tabella.
+    numero di fondo di tutta la tabella. <b>% netto incassato / fatturato lordo</b> e' quella stessa cifra
+    rapportata al fatturato lordo (prima di sconti e costi): quanto resta davvero in banca per ogni euro
+    battuto in cassa.
   </p>
 </div>
 """
