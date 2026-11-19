@@ -63,9 +63,16 @@ def _fmt_pct(v: float | None) -> str:
     return "—" if v is None else f"{v:.1f}%".replace(".", ",")
 
 
-def _month_label(ym: str) -> str:
+def _month_label(ym: str, n_invoices: float | None = None) -> str:
+    """Glovo fattura a quindicine (2 fatture/mese, H1+H2): se per un mese ne
+    e' arrivata solo una, il mese compare comunque nella tabella (non si
+    aspetta che sia completo) ma va segnalato come parziale, altrimenti i
+    suoi numeri sembrano un mese intero mentre sono solo meta'."""
     y, mo = ym.split("-")
-    return f"{MONTHS_IT[int(mo) - 1]} {y}"
+    label = f"{MONTHS_IT[int(mo) - 1]} {y}"
+    if n_invoices is not None and n_invoices < 2:
+        label += " (parziale)"
+    return label
 
 
 def _num(v) -> float:
@@ -84,6 +91,7 @@ def _aggregate_by_month(invoices: list[dict]) -> dict[str, dict]:
     for row in invoices:
         month = row["period_start"][:7]
         m = by_month[month]
+        m["n_invoices"] += 1
         for field in SUM_FIELDS:
             m[field] += _num(row[field])
 
@@ -139,7 +147,7 @@ def build_delivery_costs_report(config: RestaurantConfig, year: int | None = Non
     divider_style = "border-top:2px solid #999;"
 
     header_cells = f'<th style="{th_label_style}">Voce</th>' + "".join(
-        f'<th style="{th_style}">{_month_label(ym)}</th>' for ym in months
+        f'<th style="{th_style}">{_month_label(ym, by_month[ym]["n_invoices"])}</th>' for ym in months
     )
 
     body_rows = []
@@ -156,7 +164,7 @@ def build_delivery_costs_report(config: RestaurantConfig, year: int | None = Non
 
     last = by_month[months[-1]]
     lead = (
-        f"{_month_label(months[-1])}: fatturato netto {_fmt_eur(last['fatturato_netto'])}, "
+        f"{_month_label(months[-1], last['n_invoices'])}: fatturato netto {_fmt_eur(last['fatturato_netto'])}, "
         f"costo totale piattaforma {_fmt_eur(last['costo_piattaforma_totale'])} netto IVA / "
         f"{_fmt_eur(last['costo_piattaforma_totale_lordo'])} lordo IVA "
         f"({_fmt_pct(last['pct_costo_piattaforma_totale'])} netto IVA — "
