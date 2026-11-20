@@ -1,0 +1,13 @@
+restaurant_id: "dragonkitchen"
+display_name: "Dragonkitchen"
+
+location:
+  city: "Milano"
+  country_code: "IT"
+  latitude: 45.4642
+  longitude: 9.1900
+  timezone: "Europe/Rome"
+
+delivery_costs:
+  glovo_folder_id: "1Dr_zkCVZNw9OrpzZpUeMqDBK_lC9_mK-"
+  report_folder_id: "1qlDrESwYWk7WgtZArn6qLHdXZOpptjT9"

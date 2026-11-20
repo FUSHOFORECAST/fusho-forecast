@@ -1,0 +1,13 @@
+restaurant_id: "kanji_broggi"
+display_name: "Kanji Broggi"
+
+location:
+  city: "Milano"
+  country_code: "IT"
+  latitude: 45.4642
+  longitude: 9.1900
+  timezone: "Europe/Rome"
+
+delivery_costs:
+  glovo_folder_id: "1LiYAzCv_YovsnWXfVf19Gdo8tdeviwZU"
+  report_folder_id: "1UPwhBm3jp6fCku0fF1JXpA2GEdWnY1r3"

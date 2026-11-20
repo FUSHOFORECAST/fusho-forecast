@@ -1,0 +1,13 @@
+restaurant_id: "dumpking_san_marco"
+display_name: "Dumpking San Marco"
+
+location:
+  city: "Milano"
+  country_code: "IT"
+  latitude: 45.4642
+  longitude: 9.1900
+  timezone: "Europe/Rome"
+
+delivery_costs:
+  glovo_folder_id: "1xVm0qAMsqzV1ShvSXGZKTiNuJbf13Fwx"
+  report_folder_id: "1Hc4N-mRI1-pGlP-9Eld_t-0_W5ddrZb5"

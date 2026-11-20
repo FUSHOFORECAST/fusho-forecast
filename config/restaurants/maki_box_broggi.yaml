@@ -1,0 +1,13 @@
+restaurant_id: "maki_box_broggi"
+display_name: "Maki Box Broggi"
+
+location:
+  city: "Milano"
+  country_code: "IT"
+  latitude: 45.4642
+  longitude: 9.1900
+  timezone: "Europe/Rome"
+
+delivery_costs:
+  glovo_folder_id: "1mN0plmJve92o1NU3W320B9mE-H0IeKC5"
+  report_folder_id: "1d8KsaR58wIPhq5cT031Sps29IPo1CJiF"

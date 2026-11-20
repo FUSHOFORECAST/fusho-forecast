@@ -1,0 +1,13 @@
+restaurant_id: "maki_box_san_marco"
+display_name: "Maki Box San Marco"
+
+location:
+  city: "Milano"
+  country_code: "IT"
+  latitude: 45.4642
+  longitude: 9.1900
+  timezone: "Europe/Rome"
+
+delivery_costs:
+  glovo_folder_id: "1o2AzZqSLjE-ycUEO2lNmE0J_qPK9vHU6"
+  report_folder_id: "1Czu3qJs69TY33MwpgpYBhDiS_iVl1UXV"

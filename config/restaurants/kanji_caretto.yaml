@@ -1,0 +1,13 @@
+restaurant_id: "kanji_caretto"
+display_name: "Kanji Caretto"
+
+location:
+  city: "Milano"
+  country_code: "IT"
+  latitude: 45.4642
+  longitude: 9.1900
+  timezone: "Europe/Rome"
+
+delivery_costs:
+  glovo_folder_id: "1RAkBfl2zuUz7CrkS_2o3LhDB7DoLN_G_"
+  report_folder_id: "11tWq3y5DH1qE66ZAyNlk0l8ZXdj3LeP6"

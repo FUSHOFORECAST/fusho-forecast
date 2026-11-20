@@ -1,0 +1,13 @@
+restaurant_id: "maki_box_caretto"
+display_name: "Maki Box Caretto"
+
+location:
+  city: "Milano"
+  country_code: "IT"
+  latitude: 45.4642
+  longitude: 9.1900
+  timezone: "Europe/Rome"
+
+delivery_costs:
+  glovo_folder_id: "1_pHJsnpNm9aMsrLzWGqcKSYEtPWC_Ljy"
+  report_folder_id: "1gdYmaZROroCeTOmeKeTmTa9L6Ra--ICk"

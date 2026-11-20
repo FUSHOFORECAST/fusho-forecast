@@ -1,0 +1,13 @@
+restaurant_id: "daruma_gyoza_bowl"
+display_name: "Daruma Gyoza Bowl"
+
+location:
+  city: "Milano"
+  country_code: "IT"
+  latitude: 45.4642
+  longitude: 9.1900
+  timezone: "Europe/Rome"
+
+delivery_costs:
+  glovo_folder_id: "1bvwmXhgAc8yAetcOTO4CjUmXHj17-QMl"
+  report_folder_id: "1DaKYZTd43uLCrPGwm2rMw-LeX5TikPWi"
