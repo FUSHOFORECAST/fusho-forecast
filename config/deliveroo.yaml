@@ -1,0 +1,7 @@
+# Cartella Drive radice di Deliveroo: unica, condivisa da tutti i ristoranti
+# (a differenza di Glovo, dove ogni ristorante ha una propria cartella, Deliveroo
+# organizza i file per periodo e dentro ogni periodo una sottocartella per
+# ristorante -- quindi qui serve una sola root, non una per ristorante).
+# Va condivisa (permesso Visualizzatore) con l'email del service account,
+# come le cartelle Glovo.
+root_folder_id: "1bGXHB8pCmeo-uL1Z8cUVliiHoHQOW5Ul"

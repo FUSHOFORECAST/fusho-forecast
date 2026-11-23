@@ -45,6 +45,10 @@ class RestaurantConfig:
         return Path(f"data/{self.restaurant_id}/raw_glovo")
 
     @property
+    def raw_deliveroo_dir(self) -> Path:
+        return Path(f"data/{self.restaurant_id}/raw_deliveroo")
+
+    @property
     def processed_dir(self) -> Path:
         return Path(f"data/{self.restaurant_id}/processed")
 

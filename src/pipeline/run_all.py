@@ -10,6 +10,8 @@ from pathlib import Path
 from src.pipeline.config import list_restaurant_configs, load_restaurant_config
 from src.pipeline.delivery_costs import run_delivery_costs_pipeline
 from src.pipeline.delivery_costs_report import publish_delivery_costs_report
+from src.pipeline.deliveroo_costs import run_deliveroo_costs_pipeline
+from src.pipeline.deliveroo_costs_report import publish_deliveroo_costs_report
 from src.pipeline.food_cost import run_food_cost_pipeline
 
 LOGS_DIR = Path("logs")
@@ -65,6 +67,25 @@ def run_one(config_path: Path):
                         print(f"Report delivery pubblicato su Drive: {file_id}")
                 except Exception:
                     buffer.write("\nAVVISO: pubblicazione report delivery su Drive fallita:\n")
+                    buffer.write(traceback.format_exc())
+
+    if config.delivery_costs.deliveroo_code:
+        try:
+            with redirect_stdout(buffer):
+                result = run_deliveroo_costs_pipeline(config)
+                print(f"Deliveroo costs: {result}")
+        except Exception:
+            success = False
+            error_message = traceback.format_exc()
+            buffer.write("\nERRORE: pipeline deliveroo costs fallita:\n" + error_message)
+        else:
+            if result.get("n_new_statements") or os.environ.get("FORCE_REPORT_PUBLISH") == "true":
+                try:
+                    with redirect_stdout(buffer):
+                        file_id = publish_deliveroo_costs_report(config)
+                        print(f"Report Deliveroo pubblicato su Drive: {file_id}")
+                except Exception:
+                    buffer.write("\nAVVISO: pubblicazione report deliveroo su Drive fallita:\n")
                     buffer.write(traceback.format_exc())
 
     duration = time.time() - start
