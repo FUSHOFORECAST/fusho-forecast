@@ -175,7 +175,7 @@ def build_delivery_costs_report(config: RestaurantConfig, year: int | None = Non
 
     html = f"""\
 <div style="font-family:-apple-system,Helvetica,Arial,sans-serif;color:#1a1a1a;max-width:900px;">
-  <h2 style="font-size:18px;margin:0 0 4px 0;">Margini Delivery — Glovo ({config.display_name})</h2>
+  <h2 style="font-size:18px;margin:0 0 4px 0;">Glovo Margini Delivery ({config.display_name})</h2>
   <p style="color:#555;font-size:13px;margin:0 0 16px 0;">{lead}</p>
   <table style="border-collapse:collapse;width:100%;font-size:12px;">
     <thead><tr>{header_cells}</tr></thead>
@@ -201,7 +201,7 @@ def build_delivery_costs_report(config: RestaurantConfig, year: int | None = Non
 </div>
 """
 
-    title = f"Margini delivery Glovo {config.display_name} — {_month_label(months[-1])}"
+    title = f"Glovo Margini delivery {config.display_name} — {_month_label(months[-1])}"
     return title, html
 
 
@@ -254,5 +254,18 @@ def publish_delivery_costs_report(config: RestaurantConfig) -> str | None:
     # service account: su Drive personale non ha quota per possedere file).
     service = _build_drive_oauth_service()
     year_folder_id = _find_or_create_subfolder(service, config.delivery_costs.report_folder_id, str(year))
-    file_id = upload_file_to_drive(service, year_folder_id, pdf_path, "Margini Delivery Glovo.pdf")
+
+    # Migrazione una tantum: il report si chiamava "Margini Delivery Glovo.pdf"
+    # prima di invertire l'ordine del nome -- rinomina il file gia' pubblicato
+    # invece di lasciarlo orfano in Drive mentre se ne crea uno nuovo col nome
+    # aggiornato. No-op una volta completata (il vecchio nome non c'e' piu').
+    old_name_query = (
+        f"'{year_folder_id}' in parents and trashed = false "
+        "and name = 'Margini Delivery Glovo.pdf'"
+    )
+    old_files = service.files().list(q=old_name_query, fields="files(id)").execute().get("files", [])
+    for old_file in old_files:
+        service.files().update(fileId=old_file["id"], body={"name": "Glovo Margini Delivery.pdf"}).execute()
+
+    file_id = upload_file_to_drive(service, year_folder_id, pdf_path, "Glovo Margini Delivery.pdf")
     return file_id
