@@ -19,7 +19,8 @@ SUM_FIELDS = [
     "prodotti", "sconti", "fatturato_netto",
     "commissione", "commissione_lordo", "ads", "ads_lordo", "prime", "prime_lordo",
     "offerta_lampo", "offerta_lampo_lordo",
-    "errori", "costo_piattaforma_totale", "costo_piattaforma_totale_lordo", "importo_bonifico",
+    "errori", "costo_piattaforma_totale", "costo_piattaforma_totale_lordo",
+    "rettifiche_fatturazione", "importo_bonifico",
 ]
 
 # (etichetta, campo, formattatore, riga secondaria, separatore sopra)
@@ -50,6 +51,7 @@ TABLE_ROWS = [
     ("% offerta lampo (lordo IVA)", "pct_offerta_lampo_lordo", "pct", True, False),
     ("Errori €", "errori", "eur", False, True),
     ("% errori", "pct_errori", "pct", True, False),
+    ("Rettifiche fatturazione (rimborsi/già pagati/debito)", "rettifiche_fatturazione", "eur", False, True),
     ("Netto incassato (bonifico Glovo)", "importo_bonifico", "eur", False, True),
     ("% netto incassato / fatturato netto", "pct_netto_incassato", "pct", True, False),
 ]
@@ -197,6 +199,12 @@ def build_delivery_costs_report(config: RestaurantConfig, year: int | None = Non
     numero di fondo di tutta la tabella. <b>% netto incassato / fatturato netto</b> e' quella stessa cifra
     rapportata al fatturato netto (prodotti - sconti, la stessa base di tutte le altre percentuali della
     tabella): quanto resta davvero in banca per ogni euro di incasso di cassa al netto degli sconti.
+    <b>Rettifiche fatturazione</b> raccoglie 3 voci della fattura che non sono un costo di questo periodo ma
+    aggiustano comunque il bonifico finale: rimborsi al partner senza commissione Glovo (positivo), importi che
+    Glovo ha gia' versato in anticipo in un periodo precedente (negativo, "gia' pagati"), debito accumulato
+    pregresso (negativo) -- spesso e' zero, ma quando non lo e' spiega perche' "fatturato netto − costo tot.
+    (lordo IVA)" non coincide col netto incassato: netto incassato = fatturato netto − costo tot. (lordo IVA)
+    + rettifiche fatturazione.
   </p>
 </div>
 """

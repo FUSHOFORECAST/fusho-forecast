@@ -132,10 +132,14 @@ def _delivery_costs_state_id(restaurant_id: str) -> str:
     lordo IVA; v6: lettura multi-pagina, corregge l'importo del bonifico
     mancante sulle fatture con voci di costo extra; v7: "offerta lampo"
     mappata come voce propria invece di restare nascosta in "altro"/sconti
-    generici) -- altrimenti la cache di stato su GitHub Actions terrebbe per
-    sempre i record vecchi, dato che il riparsing scatta solo sui filename
-    nuovi."""
-    return f"{restaurant_id}_glovo_v7"
+    generici; v8: espone rimborsi_partner/glovo_gia_pagati/debito_accumulato
+    e la loro somma "rettifiche_fatturazione" -- senza, "fatturato netto -
+    costo totale" non torna con "netto incassato" ogni volta che queste voci
+    di riconciliazione non sono a zero, e il report non lo spiegava da
+    nessuna parte) -- altrimenti la cache di stato su GitHub Actions terrebbe
+    per sempre i record vecchi, dato che il riparsing scatta solo sui
+    filename nuovi."""
+    return f"{restaurant_id}_glovo_v8"
 
 
 def _find_invoice_pdfs(service, folder_id: str) -> list[dict]:
@@ -294,6 +298,20 @@ def parse_invoice_pdf(path: Path) -> dict:
         commissione_lordo + ads_lordo + prime_lordo + offerta_lampo_lordo + errori + altro_lordo, 2
     )
 
+    # Voci di riconciliazione della fattura che NON sono un costo piattaforma
+    # (non si ripetono ogni periodo, sono aggiustamenti legati al bonifico
+    # stesso: un anticipo gia' versato da Glovo, un rimborso senza commissione,
+    # un debito pregresso) -- per questo restano fuori da costo_piattaforma_totale.
+    # Ma se non vengono mostrate da nessuna parte, "fatturato netto - costo
+    # totale" non torna con "netto incassato" ogni volta che non sono a zero
+    # (confermato su una fattura reale FUSHO: -307,73 di "Glovo gia' pagati"
+    # spiega esattamente la differenza) -- quindi vanno riportate, non sommate
+    # nel costo.
+    rimborsi_partner = raw.get("rimborsi_partner", 0.0)
+    glovo_gia_pagati = raw.get("glovo_gia_pagati", 0.0)
+    debito_accumulato = raw.get("debito_accumulato", 0.0)
+    rettifiche_fatturazione = round(rimborsi_partner + glovo_gia_pagati + debito_accumulato, 2)
+
     return {
         "filename": path.name,
         "invoice_number": invoice_match.group(1) if invoice_match else None,
@@ -315,6 +333,10 @@ def parse_invoice_pdf(path: Path) -> dict:
         "altro_lordo": altro_lordo,
         "costo_piattaforma_totale": costo_piattaforma_totale,
         "costo_piattaforma_totale_lordo": costo_piattaforma_totale_lordo,
+        "rimborsi_partner": rimborsi_partner,
+        "glovo_gia_pagati": glovo_gia_pagati,
+        "debito_accumulato": debito_accumulato,
+        "rettifiche_fatturazione": rettifiche_fatturazione,
         "iva_servizi": raw.get("iva"),
         "totale_fattura": raw.get("totale_fattura"),
         "importo_bonifico": raw.get("importo_bonifico"),
@@ -339,8 +361,9 @@ _INVOICE_FIELDS = [
     "commissione", "commissione_lordo", "ads", "ads_lordo", "prime", "prime_lordo",
     "offerta_lampo", "offerta_lampo_lordo",
     "errori", "altro", "altro_lordo",
-    "costo_piattaforma_totale", "costo_piattaforma_totale_lordo", "iva_servizi",
-    "totale_fattura", "importo_bonifico",
+    "costo_piattaforma_totale", "costo_piattaforma_totale_lordo",
+    "rimborsi_partner", "glovo_gia_pagati", "debito_accumulato", "rettifiche_fatturazione",
+    "iva_servizi", "totale_fattura", "importo_bonifico",
 ]
 
 
@@ -365,8 +388,9 @@ def _aggregate_monthly(config: RestaurantConfig, records: dict[str, dict]) -> No
         "commissione", "commissione_lordo", "ads", "ads_lordo", "prime", "prime_lordo",
         "offerta_lampo", "offerta_lampo_lordo",
         "errori", "altro", "altro_lordo",
-        "costo_piattaforma_totale", "costo_piattaforma_totale_lordo", "iva_servizi",
-        "totale_fattura", "importo_bonifico",
+        "costo_piattaforma_totale", "costo_piattaforma_totale_lordo",
+        "rimborsi_partner", "glovo_gia_pagati", "debito_accumulato", "rettifiche_fatturazione",
+        "iva_servizi", "totale_fattura", "importo_bonifico",
     ]
 
     for record in records.values():
