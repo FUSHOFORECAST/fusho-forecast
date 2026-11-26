@@ -32,18 +32,24 @@ from src.pipeline.sync_state import load_last_signature, save_signature
 
 GOOGLE_FOLDER_MIME = "application/vnd.google-apps.folder"
 
-# Tipi di riga confermati sui CSV reali visti finora (file FUSHO e La Gyozeria
-# Viale Monza): "Consegna" (ordine), "Pagamento in contanti" (il cliente paga
-# cash, Deliveroo lo detrae dal bonifico -- non e' un costo, e' cassa gia'
-# incassata dal ristorante) e "Rimborso al cliente" (storno per un problema
-# sull'ordine, un costo vero e proprio). Qualunque altra "Attività" mai vista
+# Tipi di riga confermati sui CSV reali visti finora (file FUSHO, La Gyozeria
+# Viale Monza, Ramen Shifu Filzi): "Consegna" (ordine), "Pagamento in
+# contanti" (il cliente paga cash, Deliveroo lo detrae dal bonifico -- non e'
+# un costo, e' cassa gia' incassata dal ristorante), "Rimborso al cliente"
+# (storno per un problema sull'ordine, un costo vero e proprio) e "Annunci
+# Marketer" (canone pubblicitario Deliveroo "Marketer", addebitato a giornata
+# -- visto solo su Ramen Shifu Filzi, che aderisce a questo programma; un
+# costo vero, Nota tipo "Ad Fee (2026/09/01)", niente a che vedere con lo
+# sconto "Sconto offerta Marketer" sulle righe Consegna, quello e' uno sconto
+# sul prezzo ordine, non un canone). Qualunque altra "Attività" mai vista
 # finisce comunque nel bucket generico "altro" invece di essere persa: stesso
 # principio di LABEL_KEY_MAP/unmapped_fields in delivery_costs.py, non si
 # guessa una struttura mai verificata sui byte reali del file.
 ORDER_ACTIVITY = "Consegna"
 CASH_ACTIVITY = "Pagamento in contanti"
 REFUND_ACTIVITY = "Rimborso al cliente"
-KNOWN_ACTIVITIES = {ORDER_ACTIVITY, CASH_ACTIVITY, REFUND_ACTIVITY}
+ADS_ACTIVITY = "Annunci Marketer"
+KNOWN_ACTIVITIES = {ORDER_ACTIVITY, CASH_ACTIVITY, REFUND_ACTIVITY, ADS_ACTIVITY}
 
 # "Nota" sulle righe Consegna puo' contenere "Sconto offerta Marketer: 2,00"
 # (visto su file reali, La Gyozeria Viale Monza, novembre 2026) -- importo del
@@ -195,13 +201,14 @@ def _date_from_filename(path: Path) -> str | None:
 def parse_statement_csv(path: Path) -> dict:
     """Estrae da un CSV settimanale Deliveroo i totali aggregati (commissione,
     IVA sulla commissione, netto da incassare, ordini, sconti marketing
-    informativi), piu' tre bucket per le righe non-ordine confermate sui file
-    reali: "contanti" (pagamenti in contanti gia' incassati dal ristorante,
-    dedotti dal bonifico -- non un costo), "rimborsi" (storni al cliente, un
-    costo vero) e un residuo "altro" generico per qualunque "Attività" mai
-    vista -- stesso principio delle voci non mappate in delivery_costs.py: mai
-    perse silenziosamente, finiscono in un totale visibile invece che dentro
-    una delle due voci confermate."""
+    informativi), piu' quattro bucket per le righe non-ordine confermate sui
+    file reali: "contanti" (pagamenti in contanti gia' incassati dal
+    ristorante, dedotti dal bonifico -- non un costo), "rimborsi" (storni al
+    cliente, un costo vero), "pubblicita" (canone Deliveroo "Annunci
+    Marketer", un costo vero non legato a un ordine) e un residuo "altro"
+    generico per qualunque "Attività" mai vista -- stesso principio delle voci
+    non mappate in delivery_costs.py: mai perse silenziosamente, finiscono in
+    un totale visibile invece che dentro una delle voci confermate."""
     records = _parse_statement_sections(path)
 
     orders = [r for r in records if r.get("Attività", "").strip() == ORDER_ACTIVITY]
@@ -212,23 +219,28 @@ def parse_statement_csv(path: Path) -> dict:
 
     cash_rows = [r for r in records if r.get("Attività", "").strip() == CASH_ACTIVITY]
     refund_rows = [r for r in records if r.get("Attività", "").strip() == REFUND_ACTIVITY]
+    ads_rows = [r for r in records if r.get("Attività", "").strip() == ADS_ACTIVITY]
     other_rows = [
         r for r in records
-        if r.get("Attività", "").strip() not in (ORDER_ACTIVITY, CASH_ACTIVITY, REFUND_ACTIVITY)
+        if r.get("Attività", "").strip() not in (ORDER_ACTIVITY, CASH_ACTIVITY, REFUND_ACTIVITY, ADS_ACTIVITY)
     ]
 
     # Commissione/IVA calcolate solo sulle righe Consegna (il costo e' per
     # definizione legato all'ordine): qualunque altra riga (pagamento in
-    # contanti, rimborso, o un tipo mai visto) va invece per intero in uno dei
-    # tre bucket qui sotto usando il suo "Totale da pagare" gia' netto, cosi'
-    # la somma totale_da_pagare = valore_ordini - commissione - commissione_iva
-    # - contanti - rimborsi - altro torna sempre, senza contare due volte la
-    # stessa commissione.
+    # contanti, rimborso, canone pubblicitario, o un tipo mai visto) va invece
+    # per intero in uno dei quattro bucket qui sotto usando il suo "Totale da
+    # pagare" gia' netto, cosi' la somma totale_da_pagare = valore_ordini -
+    # commissione - commissione_iva - contanti - rimborsi - pubblicita + altro
+    # torna sempre (gli ultimi tre sottratti come importo assoluto perche' il
+    # segno e' confermato su dati reali, "altro" sommato col suo segno
+    # originale perche' non e' detto sia sempre un costo), senza contare due
+    # volte la stessa commissione.
     valore_ordini = round(sum(_it_number_to_float(r.get("Valore dell'ordine (€)")) for r in orders), 2)
     commissione = round(sum(_it_number_to_float(r.get("Commissione Deliveroo (€)")) for r in orders), 2)
     commissione_iva = round(sum(_it_number_to_float(r.get("Commissione / rettifica IVA (€)")) for r in orders), 2)
     contanti = round(sum(_it_number_to_float(r.get("Totale da pagare")) for r in cash_rows), 2)
     rimborsi = round(sum(_it_number_to_float(r.get("Totale da pagare")) for r in refund_rows), 2)
+    pubblicita = round(sum(_it_number_to_float(r.get("Totale da pagare")) for r in ads_rows), 2)
     altro = round(sum(_it_number_to_float(r.get("Totale da pagare")) for r in other_rows), 2)
     totale_da_pagare = round(sum(_it_number_to_float(r.get("Totale da pagare")) for r in records), 2)
 
@@ -265,22 +277,32 @@ def parse_statement_csv(path: Path) -> dict:
         "sconti_marketing": sconti_marketing,
         "contanti": abs(contanti),
         "rimborsi": abs(rimborsi),
-        "altro": abs(altro),
+        "pubblicita": abs(pubblicita),
+        # "altro" e' l'unico bucket che tiene il segno originale (invece di
+        # abs() come gli altri): cattura "Attività" mai viste prima, quindi
+        # non si puo' assumere a priori che sia sempre un costo -- es. una
+        # riconsegna/rifacimento ordine puo' generare un credito al
+        # ristorante maggiore della commissione addebitata (netto positivo).
+        # Negativo = ha ridotto il totale pagato (costo), positivo = lo ha
+        # aumentato (credito) -- vedi anche totale_da_pagare qui sotto, che
+        # si ricostruisce sommando (non sottraendo) questo valore.
+        "altro": altro,
         "totale_da_pagare": totale_da_pagare,
         "unknown_activities": unknown_activities,
     }
 
 
 def _deliveroo_state_id(restaurant_id: str) -> str:
-    """v2: separa dal bucket "altro" i due tipi di riga confermati su dati
-    reali -- "contanti" (pagamenti in contanti, non un costo) e "rimborsi"
-    (storni al cliente, un costo vero) -- cosi' il campo "altro" resta un
-    residuo generico invece di mischiare le due cose. Se cambiano ancora i
-    campi salvati andra' incrementato di nuovo (stesso schema di
-    versionamento di delivery_costs.py), cosi' il riparsing scatta su tutti
-    gli statement gia' noti invece di tenere per sempre i record col formato
-    vecchio."""
-    return f"{restaurant_id}_deliveroo_v2"
+    """v3: separa dal bucket "altro" anche "pubblicita" (canone Deliveroo
+    "Annunci Marketer", visto su Ramen Shifu Filzi -- un costo vero, non
+    legato a un singolo ordine) -- era la causa principale di un "Altro"
+    diverso da zero per quel ristorante. v2 aveva gia' separato "contanti"
+    (pagamenti in contanti, non un costo) e "rimborsi" (storni al cliente, un
+    costo vero) dallo stesso bucket. Se cambiano ancora i campi salvati andra'
+    incrementato di nuovo (stesso schema di versionamento di
+    delivery_costs.py), cosi' il riparsing scatta su tutti gli statement gia'
+    noti invece di tenere per sempre i record col formato vecchio."""
+    return f"{restaurant_id}_deliveroo_v3"
 
 
 def _load_deliveroo_state(restaurant_id: str) -> dict:
@@ -296,7 +318,7 @@ def _save_deliveroo_record(restaurant_id: str, filename: str, record: dict) -> N
 _STATEMENT_FIELDS = [
     "filename", "restaurant_name", "period_start", "period_end", "n_orders",
     "valore_ordini", "commissione", "commissione_iva", "sconti_marketing",
-    "contanti", "rimborsi", "altro", "totale_da_pagare",
+    "contanti", "rimborsi", "pubblicita", "altro", "totale_da_pagare",
 ]
 
 
@@ -318,7 +340,7 @@ def _aggregate_monthly(config: RestaurantConfig, records: dict[str, dict]) -> No
     monthly: dict[str, dict] = {}
     money_fields = [
         "valore_ordini", "commissione", "commissione_iva", "sconti_marketing",
-        "contanti", "rimborsi", "altro", "totale_da_pagare",
+        "contanti", "rimborsi", "pubblicita", "altro", "totale_da_pagare",
     ]
 
     for record in records.values():

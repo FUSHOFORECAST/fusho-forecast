@@ -26,7 +26,7 @@ MONTHS_IT = [
 
 SUM_FIELDS = [
     "valore_ordini", "commissione", "commissione_iva", "sconti_marketing",
-    "contanti", "rimborsi", "altro", "totale_da_pagare",
+    "contanti", "rimborsi", "pubblicita", "altro", "totale_da_pagare",
 ]
 
 TABLE_ROWS = [
@@ -38,6 +38,7 @@ TABLE_ROWS = [
     ("Rimborsi al cliente", "rimborsi", "eur", False, True),
     ("% rimborsi / fatturato ordini", "pct_rimborsi", "pct", True, False),
     ("Contanti (incassati dal ristorante, dedotti dal bonifico)", "contanti", "eur", False, True),
+    ("Pubblicità (canone Deliveroo \"Annunci Marketer\")", "pubblicita", "eur", False, True),
     ("Altro (non ancora classificato)", "altro", "eur", False, True),
     ("Sconti marketing (informativo, gia' nel prezzo ordine)", "sconti_marketing", "eur", False, True),
     ("Netto incassato via bonifico (da Deliveroo)", "totale_da_pagare", "eur", False, True),
@@ -188,10 +189,18 @@ def build_deliveroo_costs_report(config: RestaurantConfig, year: int | None = No
     vista su Glovo). <b>Rimborsi al cliente</b> e' un costo vero: storni per problemi sull'ordine (es. articolo
     sbagliato o mancante) detratti dal bonifico -- equivalente agli "Errori" del report Glovo. <b>Contanti</b>
     NON e' un costo: sono ordini pagati in contanti direttamente al corriere, gia' incassati dal ristorante, che
-    Deliveroo detrae dal bonifico per non pagarli due volte (altrimenti li pagherebbe anche lui). <b>Altro</b> e'
-    un residuo generico per qualunque tipo di riga diverso da ordine/rimborso/contanti mai ancora visto sui CSV
-    reali: resta sempre a zero finche' Deliveroo non introduce un nuovo tipo di rendiconto, cosi' il totale resta
-    corretto anche in quel caso invece di nascondere l'importo dentro una delle altre voci. <b>Sconti marketing</b>
+    Deliveroo detrae dal bonifico per non pagarli due volte (altrimenti li pagherebbe anche lui). <b>Pubblicità</b>
+    e' un costo vero: il canone del programma pubblicitario Deliveroo "Annunci Marketer" (visibile sul CSV come
+    "Ad Fee", addebitato a giornata, non legato a un singolo ordine) -- presente solo per i ristoranti che aderiscono
+    a questo programma, non va confuso con lo "sconto offerta Marketer" (voce informativa sulle righe ordine, gia'
+    incluso nel prezzo). <b>Altro</b> e' un residuo generico per qualunque tipo di riga diversa da
+    ordine/rimborso/contanti/pubblicità mai ancora vista sui CSV reali (es. le rare rettifiche quando un ordine va
+    riconsegnato/rifatto): resta a zero finche' Deliveroo non introduce un nuovo tipo di rendiconto non ancora
+    osservato, cosi' il totale resta corretto anche in quel caso invece di nascondere l'importo dentro una delle
+    altre voci. A differenza delle altre voci (mostrate come importo assoluto, perche' la direzione e' gia'
+    confermata sui dati reali), <b>Altro</b> mantiene il segno originale: un valore negativo ha ridotto l'incasso
+    (e' un costo), uno positivo lo ha aumentato (e' un credito a favore del ristorante -- es. nella riconsegna qui
+    sopra il credito ricevuto per il rifacimento supera la commissione addebitata, netto positivo). <b>Sconti marketing</b>
     e' il totale degli sconti "offerta Marketer" segnalati sugli ordini: e' gia' incluso nel prezzo ordine (la
     commissione si calcola sul valore gia' scontato) -- riportato come informazione, non e' un costo aggiuntivo
     confermato a carico del ristorante. <b>Netto incassato via bonifico</b> e' solo la parte che Deliveroo versa
