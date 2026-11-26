@@ -20,7 +20,7 @@ SUM_FIELDS = [
     "commissione", "commissione_lordo", "ads", "ads_lordo", "prime", "prime_lordo",
     "offerta_lampo", "offerta_lampo_lordo",
     "errori", "costo_piattaforma_totale", "costo_piattaforma_totale_lordo",
-    "rettifiche_fatturazione", "importo_bonifico",
+    "rettifiche_fatturazione", "contanti", "importo_bonifico",
 ]
 
 # (etichetta, campo, formattatore, riga secondaria, separatore sopra)
@@ -51,9 +51,11 @@ TABLE_ROWS = [
     ("% offerta lampo (lordo IVA)", "pct_offerta_lampo_lordo", "pct", True, False),
     ("Errori €", "errori", "eur", False, True),
     ("% errori", "pct_errori", "pct", True, False),
-    ("Rettifiche fatturazione (rimborsi/già pagati/debito)", "rettifiche_fatturazione", "eur", False, True),
-    ("Netto incassato (bonifico Glovo)", "importo_bonifico", "eur", False, True),
-    ("% netto incassato / fatturato netto", "pct_netto_incassato", "pct", True, False),
+    ("Rettifiche fatturazione (rimborsi/debito)", "rettifiche_fatturazione", "eur", False, True),
+    ("Contanti (incassati dal ristorante, anticipati da Glovo)", "contanti", "eur", False, True),
+    ("Netto incassato via bonifico (Glovo)", "importo_bonifico", "eur", False, True),
+    ("Incasso totale (bonifico + contanti già anticipati)", "incasso_totale", "eur", False, True),
+    ("% incasso totale / fatturato netto", "pct_incasso_totale", "pct", True, False),
 ]
 
 
@@ -99,14 +101,20 @@ def _aggregate_by_month(invoices: list[dict]) -> dict[str, dict]:
 
     for m in by_month.values():
         m["pct_sconti"] = (m["sconti"] / m["prodotti"] * 100) if m["prodotti"] else None
-        # Quanto resta davvero in banca (bonifico Glovo, gia' al netto di
-        # tutti i costi) per ogni euro di fatturato netto (prodotti -
-        # sconti) -- stessa base di tutte le altre percentuali della
-        # tabella (costo tot., commissioni, ads, prime, offerta lampo,
-        # errori), per restare confrontabili fra loro. Un unico valore (non
-        # netto/lordo IVA): il bonifico e' gia' l'importo reale finale, non
-        # una voce scomponibile per IVA.
-        m["pct_netto_incassato"] = (m["importo_bonifico"] / m["fatturato_netto"] * 100) if m["fatturato_netto"] else None
+        # "Netto incassato via bonifico" e' solo la parte che Glovo versa in
+        # banca. Ma i contanti anticipati ("glovo gia' pagati") sono soldi che
+        # il ristorante ha gia' incassato alla consegna -- vanno sommati per
+        # avere il vero incasso totale (stesso principio di Deliveroo: il
+        # bonifico da solo sottostima quanto resta davvero al ristorante).
+        m["incasso_totale"] = round(m["importo_bonifico"] + m["contanti"], 2)
+        # Quanto resta davvero al ristorante (bonifico + contanti, gia' al
+        # netto di tutti i costi) per ogni euro di fatturato netto (prodotti -
+        # sconti) -- stessa base di tutte le altre percentuali della tabella
+        # (costo tot., commissioni, ads, prime, offerta lampo, errori), per
+        # restare confrontabili fra loro. Un unico valore (non netto/lordo
+        # IVA): l'incasso totale e' gia' l'importo reale finale, non una voce
+        # scomponibile per IVA.
+        m["pct_incasso_totale"] = (m["incasso_totale"] / m["fatturato_netto"] * 100) if m["fatturato_netto"] else None
         for field in ["costo_piattaforma_totale", "commissione", "ads", "prime", "offerta_lampo", "errori"]:
             m[f"pct_{field}"] = (m[field] / m["fatturato_netto"] * 100) if m["fatturato_netto"] else None
         # Stesso fatturato (quello che batti in cassa, gia' IVA inclusa) a
@@ -171,8 +179,9 @@ def build_delivery_costs_report(config: RestaurantConfig, year: int | None = Non
         f"{_fmt_eur(last['costo_piattaforma_totale_lordo'])} lordo IVA "
         f"({_fmt_pct(last['pct_costo_piattaforma_totale'])} netto IVA — "
         f"{_fmt_pct(last['pct_costo_piattaforma_totale_lordo'])} lordo IVA) — "
-        f"netto incassato (bonifico Glovo): {_fmt_eur(last['importo_bonifico'])} "
-        f"({_fmt_pct(last['pct_netto_incassato'])} del fatturato netto)."
+        f"incasso totale: {_fmt_eur(last['incasso_totale'])} "
+        f"({_fmt_pct(last['pct_incasso_totale'])} del fatturato netto), "
+        f"di cui {_fmt_eur(last['importo_bonifico'])} via bonifico Glovo e {_fmt_eur(last['contanti'])} in contanti."
     )
 
     html = f"""\
@@ -194,17 +203,19 @@ def build_delivery_costs_report(config: RestaurantConfig, year: int | None = Non
     fattura, IVA servizi esclusa) e "lordo IVA" (con l'IVA servizi inclusa, cioe' i soldi che escono
     davvero dal conto) -- le due aliquote (IVA food e IVA servizi) restano diverse, quindi sono due letture
     dello stesso costo, non un confronto "a pari IVA". % sconti resta su prodotti/fatturato lordo (prima
-    degli sconti), non ha componente IVA. <b>Netto incassato</b> e' l'importo del bonifico che Glovo versa
-    davvero in banca, gia' al netto di tutti i costi (commissioni, ads, prime, errori, lordo IVA) -- il
-    numero di fondo di tutta la tabella. <b>% netto incassato / fatturato netto</b> e' quella stessa cifra
-    rapportata al fatturato netto (prodotti - sconti, la stessa base di tutte le altre percentuali della
-    tabella): quanto resta davvero in banca per ogni euro di incasso di cassa al netto degli sconti.
-    <b>Rettifiche fatturazione</b> raccoglie 3 voci della fattura che non sono un costo di questo periodo ma
-    aggiustano comunque il bonifico finale: rimborsi al partner senza commissione Glovo (positivo), importi che
-    Glovo ha gia' versato in anticipo in un periodo precedente (negativo, "gia' pagati"), debito accumulato
-    pregresso (negativo) -- spesso e' zero, ma quando non lo e' spiega perche' "fatturato netto − costo tot.
-    (lordo IVA)" non coincide col netto incassato: netto incassato = fatturato netto − costo tot. (lordo IVA)
-    + rettifiche fatturazione.
+    degli sconti), non ha componente IVA. <b>Rettifiche fatturazione</b> raccoglie 2 voci della fattura che
+    non sono un costo di questo periodo ma aggiustano comunque il bonifico finale: rimborsi al partner senza
+    commissione Glovo (positivo), debito accumulato pregresso (negativo) -- spesso e' zero. <b>Contanti</b>
+    NON e' un costo: e' "Glovo gia' pagati", un anticipo in contanti che il ristorante ha gia' incassato alla
+    consegna -- Glovo lo detrae dal bonifico per non pagarlo due volte. <b>Netto incassato via bonifico</b> e'
+    solo l'importo che Glovo versa in banca (gia' al netto di tutti i costi, lordo IVA, e delle rettifiche).
+    <b>Incasso totale</b> e' il vero incasso complessivo del ristorante: bonifico + contanti gia' anticipati
+    (i contanti non passano dal conto corrente, ma sono comunque soldi incassati) -- e' questa la cifra da
+    confrontare col fatturato netto per capire quanto resta davvero al ristorante, non il solo bonifico:
+    incasso totale = fatturato netto − costo tot. (lordo IVA) + rettifiche fatturazione + contanti.
+    <b>% incasso totale / fatturato netto</b> e' quella stessa cifra rapportata al fatturato netto
+    (prodotti - sconti, la stessa base di tutte le altre percentuali della tabella): quanto resta davvero al
+    ristorante per ogni euro di incasso di cassa al netto degli sconti.
   </p>
 </div>
 """

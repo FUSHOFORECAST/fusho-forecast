@@ -136,10 +136,14 @@ def _delivery_costs_state_id(restaurant_id: str) -> str:
     e la loro somma "rettifiche_fatturazione" -- senza, "fatturato netto -
     costo totale" non torna con "netto incassato" ogni volta che queste voci
     di riconciliazione non sono a zero, e il report non lo spiegava da
-    nessuna parte) -- altrimenti la cache di stato su GitHub Actions terrebbe
-    per sempre i record vecchi, dato che il riparsing scatta solo sui
-    filename nuovi."""
-    return f"{restaurant_id}_glovo_v8"
+    nessuna parte; v9: separa "glovo_gia_pagati" da rettifiche_fatturazione in
+    un bucket proprio "contanti" -- confermato da Davide che e' un anticipo in
+    contanti gia' incassato dal ristorante, non una rettifica di fatturazione
+    come le altre due, quindi va sommato all'incasso totale invece che solo
+    sottratto al bonifico) -- altrimenti la cache di stato su GitHub Actions
+    terrebbe per sempre i record vecchi, dato che il riparsing scatta solo
+    sui filename nuovi."""
+    return f"{restaurant_id}_glovo_v9"
 
 
 def _find_invoice_pdfs(service, folder_id: str) -> list[dict]:
@@ -300,17 +304,23 @@ def parse_invoice_pdf(path: Path) -> dict:
 
     # Voci di riconciliazione della fattura che NON sono un costo piattaforma
     # (non si ripetono ogni periodo, sono aggiustamenti legati al bonifico
-    # stesso: un anticipo gia' versato da Glovo, un rimborso senza commissione,
-    # un debito pregresso) -- per questo restano fuori da costo_piattaforma_totale.
-    # Ma se non vengono mostrate da nessuna parte, "fatturato netto - costo
-    # totale" non torna con "netto incassato" ogni volta che non sono a zero
+    # stesso) -- per questo restano fuori da costo_piattaforma_totale. Ma se
+    # non vengono mostrate da nessuna parte, "fatturato netto - costo totale"
+    # non torna con "netto incassato" ogni volta che non sono a zero
     # (confermato su una fattura reale FUSHO: -307,73 di "Glovo gia' pagati"
-    # spiega esattamente la differenza) -- quindi vanno riportate, non sommate
-    # nel costo.
+    # spiega esattamente la differenza) -- quindi vanno riportate, non perse.
+    # "Glovo gia' pagati" (confermato da Davide) e' un anticipo in contanti:
+    # il ristorante lo ha gia' incassato alla consegna, Glovo lo detrae dal
+    # bonifico per non pagarlo due volte -- stessa natura dei "Pagamento in
+    # contanti" di Deliveroo, va tenuto separato (bucket "contanti", non un
+    # costo) invece che dentro "rettifiche_fatturazione" (quella resta per i
+    # due aggiustamenti che non sono contanti gia' incassati: rimborsi al
+    # partner senza commissione, debito accumulato pregresso).
     rimborsi_partner = raw.get("rimborsi_partner", 0.0)
     glovo_gia_pagati = raw.get("glovo_gia_pagati", 0.0)
     debito_accumulato = raw.get("debito_accumulato", 0.0)
-    rettifiche_fatturazione = round(rimborsi_partner + glovo_gia_pagati + debito_accumulato, 2)
+    contanti = abs(round(glovo_gia_pagati, 2))
+    rettifiche_fatturazione = round(rimborsi_partner + debito_accumulato, 2)
 
     return {
         "filename": path.name,
@@ -337,6 +347,7 @@ def parse_invoice_pdf(path: Path) -> dict:
         "glovo_gia_pagati": glovo_gia_pagati,
         "debito_accumulato": debito_accumulato,
         "rettifiche_fatturazione": rettifiche_fatturazione,
+        "contanti": contanti,
         "iva_servizi": raw.get("iva"),
         "totale_fattura": raw.get("totale_fattura"),
         "importo_bonifico": raw.get("importo_bonifico"),
@@ -363,6 +374,7 @@ _INVOICE_FIELDS = [
     "errori", "altro", "altro_lordo",
     "costo_piattaforma_totale", "costo_piattaforma_totale_lordo",
     "rimborsi_partner", "glovo_gia_pagati", "debito_accumulato", "rettifiche_fatturazione",
+    "contanti",
     "iva_servizi", "totale_fattura", "importo_bonifico",
 ]
 
@@ -390,6 +402,7 @@ def _aggregate_monthly(config: RestaurantConfig, records: dict[str, dict]) -> No
         "errori", "altro", "altro_lordo",
         "costo_piattaforma_totale", "costo_piattaforma_totale_lordo",
         "rimborsi_partner", "glovo_gia_pagati", "debito_accumulato", "rettifiche_fatturazione",
+        "contanti",
         "iva_servizi", "totale_fattura", "importo_bonifico",
     ]
 
