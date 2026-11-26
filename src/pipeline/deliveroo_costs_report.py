@@ -39,8 +39,10 @@ TABLE_ROWS = [
     ("% rimborsi / fatturato ordini", "pct_rimborsi", "pct", True, False),
     ("Contanti (incassati dal ristorante, dedotti dal bonifico)", "contanti", "eur", False, True),
     ("Pubblicità (canone Deliveroo \"Annunci Marketer\")", "pubblicita", "eur", False, True),
+    ("% pubblicità / fatturato ordini", "pct_pubblicita", "pct", True, False),
     ("Altro (non ancora classificato)", "altro", "eur", False, True),
     ("Sconti marketing (informativo, gia' nel prezzo ordine)", "sconti_marketing", "eur", False, True),
+    ("% sconti marketing / fatturato ordini", "pct_sconti_marketing", "pct", True, False),
     ("Netto incassato via bonifico (da Deliveroo)", "totale_da_pagare", "eur", False, True),
     ("Incasso totale (bonifico + contanti gia' in cassa)", "incasso_totale", "eur", False, True),
     ("% incasso totale / fatturato ordini", "pct_incasso_totale", "pct", True, False),
@@ -116,6 +118,8 @@ def _aggregate_by_month(statements: list[dict]) -> dict[str, dict]:
         m["incasso_totale"] = round(m["totale_da_pagare"] + m["contanti"], 2)
         m["pct_commissione_totale"] = (m["commissione_totale"] / m["valore_ordini"] * 100) if m["valore_ordini"] else None
         m["pct_rimborsi"] = (m["rimborsi"] / m["valore_ordini"] * 100) if m["valore_ordini"] else None
+        m["pct_pubblicita"] = (m["pubblicita"] / m["valore_ordini"] * 100) if m["valore_ordini"] else None
+        m["pct_sconti_marketing"] = (m["sconti_marketing"] / m["valore_ordini"] * 100) if m["valore_ordini"] else None
         m["pct_incasso_totale"] = (m["incasso_totale"] / m["valore_ordini"] * 100) if m["valore_ordini"] else None
         m["_is_partial"] = _month_is_partial(month, last_period_end.get(month))
 
