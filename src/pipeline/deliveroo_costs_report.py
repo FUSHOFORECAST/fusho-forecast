@@ -24,7 +24,10 @@ MONTHS_IT = [
     "agosto", "settembre", "ottobre", "novembre", "dicembre",
 ]
 
-SUM_FIELDS = ["valore_ordini", "commissione", "commissione_iva", "sconti_marketing", "altro", "totale_da_pagare"]
+SUM_FIELDS = [
+    "valore_ordini", "commissione", "commissione_iva", "sconti_marketing",
+    "contanti", "rimborsi", "altro", "totale_da_pagare",
+]
 
 TABLE_ROWS = [
     ("Fatturato ordini", "valore_ordini", "eur", False, False),
@@ -32,7 +35,10 @@ TABLE_ROWS = [
     ("IVA su commissione", "commissione_iva", "eur", False, False),
     ("Commissione totale (lordo IVA)", "commissione_totale", "eur", False, False),
     ("% commissione totale / fatturato ordini", "pct_commissione_totale", "pct", True, False),
-    ("Altro (contanti, rimborsi, rettifiche)", "altro", "eur", False, True),
+    ("Rimborsi al cliente", "rimborsi", "eur", False, True),
+    ("% rimborsi / fatturato ordini", "pct_rimborsi", "pct", True, False),
+    ("Contanti (incassati dal ristorante, dedotti dal bonifico)", "contanti", "eur", False, True),
+    ("Altro (non ancora classificato)", "altro", "eur", False, True),
     ("Sconti marketing (informativo, gia' nel prezzo ordine)", "sconti_marketing", "eur", False, True),
     ("Netto incassato (da Deliveroo)", "totale_da_pagare", "eur", False, True),
     ("% netto incassato / fatturato ordini", "pct_netto_incassato", "pct", True, False),
@@ -106,6 +112,7 @@ def _aggregate_by_month(statements: list[dict]) -> dict[str, dict]:
     for month, m in by_month.items():
         m["commissione_totale"] = round(m["commissione"] + m["commissione_iva"], 2)
         m["pct_commissione_totale"] = (m["commissione_totale"] / m["valore_ordini"] * 100) if m["valore_ordini"] else None
+        m["pct_rimborsi"] = (m["rimborsi"] / m["valore_ordini"] * 100) if m["valore_ordini"] else None
         m["pct_netto_incassato"] = (m["totale_da_pagare"] / m["valore_ordini"] * 100) if m["valore_ordini"] else None
         m["_is_partial"] = _month_is_partial(month, last_period_end.get(month))
 
@@ -175,13 +182,18 @@ def build_deliveroo_costs_report(config: RestaurantConfig, year: int | None = No
     Deliveroo fattura a settimane (non a quindicine come Glovo): un mese resta "(parziale)" finche' l'ultima
     settimana nota non arriva fino alla fine del mese di calendario. <b>Commissione totale</b> e' commissione +
     IVA sulla commissione (unica aliquota disponibile sul CSV, non c'e' la scomposizione netto/lordo per voce
-    vista su Glovo). <b>Altro</b> raccoglie per intero (gia' netto) qualunque riga del rendiconto che non sia un
-    ordine consegnato -- pagamenti in contanti, eventuali rimborsi o rettifiche -- cosi' il totale resta sempre
-    corretto anche per tipi di riga non ancora visti. <b>Sconti marketing</b> e' il totale degli sconti
-    "offerta Marketer" segnalati sugli ordini: e' gia' incluso nel prezzo ordine (la commissione si calcola sul
-    valore gia' scontato) -- riportato come informazione, non e' un costo aggiuntivo confermato a carico del
-    ristorante. <b>Netto incassato</b> e' l'importo netto che Deliveroo versa, gia' al netto di commissione, IVA
-    e qualunque rettifica.
+    vista su Glovo). <b>Rimborsi al cliente</b> e' un costo vero: storni per problemi sull'ordine (es. articolo
+    sbagliato o mancante) detratti dal bonifico -- equivalente agli "Errori" del report Glovo. <b>Contanti</b>
+    NON e' un costo: sono ordini pagati in contanti direttamente al corriere, gia' incassati dal ristorante, che
+    Deliveroo detrae dal bonifico per non pagarli due volte -- riportato solo per spiegare perche' il netto
+    incassato e' piu' basso del previsto in una settimana con molti pagamenti cash. <b>Altro</b> e' un residuo
+    generico per qualunque tipo di riga diverso da ordine/rimborso/contanti mai ancora visto sui CSV reali: resta
+    sempre a zero finche' Deliveroo non introduce un nuovo tipo di rendiconto, cosi' il totale resta corretto
+    anche in quel caso invece di nascondere l'importo dentro una delle altre voci. <b>Sconti marketing</b> e' il
+    totale degli sconti "offerta Marketer" segnalati sugli ordini: e' gia' incluso nel prezzo ordine (la
+    commissione si calcola sul valore gia' scontato) -- riportato come informazione, non e' un costo aggiuntivo
+    confermato a carico del ristorante. <b>Netto incassato</b> e' l'importo netto che Deliveroo versa, gia' al
+    netto di commissione, IVA, rimborsi e contanti.
   </p>
 </div>
 """
